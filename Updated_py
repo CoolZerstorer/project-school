@@ -284,7 +284,7 @@ style.configure(
 
 regst = ttk.Button(root, text="Register", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
-shtbl = ttk.Button(root, text="Show Tables", style="Custom.TButton", width=15, command=open_tables_window)
+shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
 exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
 regst.pack(anchor="w", padx=(40, 0), pady=(40, 45))
