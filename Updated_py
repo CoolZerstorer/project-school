@@ -9,19 +9,14 @@ from mysql.connector import Error
 # ==========================================
 def initialize_database():
     try:
-        # Connect to the general server landing pad using your working password
         conn = mysql.connector.connect(
             host="127.0.0.1",
             user="root",
-            password="root123456" # Restored defaults based on your commented code
+            password="root123456"
         )
         cursor = conn.cursor()
-        
-        # Create and select the database room
         cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
         cursor.execute("USE student_db;")
-        
-        # Build the physical storage table layout
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS students (
                 id INT AUTO_INCREMENT PRIMARY KEY,
@@ -35,7 +30,6 @@ def initialize_database():
     except Error as e:
         print(f"Database initialization error: {e}")
 
-# Run setup immediately when script boots up to ensure DB exists
 initialize_database()
 
 
@@ -46,24 +40,88 @@ initialize_database()
 def open_register_window():
     # Create the top level popup window
     reg_window = tk.Toplevel(root)
-    reg_window.title("Register Student")
-    reg_window.geometry("500x400")
+    reg_window.title("Register Student Book Issue")
+    reg_window.geometry("600x550")
     reg_window.configure(bg="#1c1c1c")
     
-    # Example elements inside the new window
-    tk.Label(reg_window, text="Register New Student", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
+    # Title inside the popup
+    tk.Label(
+        reg_window, 
+        text="Book Registration Form", 
+        font=("Segoe UI", 24, "bold"), 
+        bg="#1c1c1c", 
+        fg="#FFFCC6"
+    ).pack(pady=25)
+
+    # Sub-container frame to hold form labels and entry fields cleanly
+    form_frame = tk.Frame(reg_window, bg="#1c1c1c")
+    form_frame.pack(padx=50, fill="x")
+
+    # Helper styling options for unified look
+    lbl_opts = {"font": ("Segoe UI", 12), "bg": "#1c1c1c", "fg": "#E1E1E1", "anchor": "w"}
+    ent_opts = {"font": ("Segoe UI", 12), "width": 30, "bg": "#2d2d2d", "fg": "white", "insertbackground": "white", "relief": "flat"}
+
+    # 1. Book ID Field
+    tk.Label(form_frame, text="Book ID (Integer):", **lbl_opts).grid(row=0, column=0, sticky="w", pady=8)
+    book_id_entry = tk.Entry(form_frame, **ent_opts)
+    book_id_entry.grid(row=0, column=1, pady=8, padx=10)
+
+    # 2. Student Name Field
+    tk.Label(form_frame, text="Student Name:", **lbl_opts).grid(row=1, column=0, sticky="w", pady=8)
+    student_name_entry = tk.Entry(form_frame, **ent_opts)
+    student_name_entry.grid(row=1, column=1, pady=8, padx=10)
+
+    # 3. Date of Issue Field
+    tk.Label(form_frame, text="Date of Issue:", **lbl_opts).grid(row=2, column=0, sticky="w", pady=8)
+    date_entry = tk.Entry(form_frame, **ent_opts)
+    date_entry.grid(row=2, column=1, pady=8, padx=10)
     
-    # You can move your name_entry and grade_entry fields inside here later!
-    tk.Label(reg_window, text="Student Name:", font=("Segoe UI", 12), bg="#1c1c1c", fg="white").pack(anchor="w", padx=50)
-    name_entry = tk.Entry(reg_window, font=("Segoe UI", 12), width=30)
-    name_entry.pack(pady=5, padx=50, anchor="w")
+    # 4. Book Name Field
+    tk.Label(form_frame, text="Book Name:", **lbl_opts).grid(row=3, column=0, sticky="w", pady=8)
+    book_name_entry = tk.Entry(form_frame, **ent_opts)
+    book_name_entry.grid(row=3, column=1, pady=8, padx=10)
+
+    # --- Button Logic Functions inside local scope ---
+    def submit_action():
+        # Quick validation check to show it functions, but does nothing to DB for now
+        b_id = book_id_entry.get().strip()
+        s_name = student_name_entry.get().strip()
+        
+        if not b_id or not s_name:
+            messagebox.showwarning("Form Notice", "Submit button clicked! Form data captured conceptually.")
+        else:
+            messagebox.showinfo("Form Action", f"Captured data for {s_name} signing out Book ID {b_id}!")
+
+    def clear_action():
+        # Deletes text content from index 0 to the very End of string
+        book_id_entry.delete(0, tk.END)
+        student_name_entry.delete(0, tk.END)
+        date_entry.delete(0, tk.END)
+        book_name_entry.delete(0, tk.END)
+
+    # --- Buttons Layout Container ---
+    btn_frame = tk.Frame(reg_window, bg="#1c1c1c")
+    btn_frame.pack(pady=40)
+
+    # Custom styles inside window for the form buttons
+    submit_btn = tk.Button(
+        btn_frame, text="Submit Data", font=("Segoe UI", 12, "bold"),
+        bg="#4CAF50", fg="black", width=15, height=1, relief="flat", command=submit_action
+    )
+    submit_btn.pack(side="left", padx=15)
+
+    clear_btn = tk.Button(
+        btn_frame, text="Clear Fields", font=("Segoe UI", 12, "bold"),
+        bg="#f44336", fg="black", width=15, height=1, relief="flat", command=clear_action
+    )
+    clear_btn.pack(side="left", padx=15)
+
 
 def open_search_window():
     search_window = tk.Toplevel(root)
     search_window.title("Search Database")
     search_window.geometry("500x400")
     search_window.configure(bg="#1c1c1c")
-    
     tk.Label(search_window, text="Search Records", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
 
 def open_tables_window():
@@ -71,57 +129,47 @@ def open_tables_window():
     tables_window.title("Database Tables")
     tables_window.geometry("600x400")
     tables_window.configure(bg="#1c1c1c")
-    
     tk.Label(tables_window, text="View All Tables", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
 
 
 # ==========================================
-# 3. TKINTER INTERFACE AND LAYOUT
+# 3. TKINTER MAIN INTERFACE AND LAYOUT
 # ==========================================
 
 root = tk.Tk()
 root.title("Library Unified Network Database")
 root.geometry("1080x640")
-root.configure(bg="#121212") # Light grey structural theme context
+root.configure(bg="#121212")
 
-# Title Screen Banner
 title_label = tk.Label(root, text="HOME", font=("Segoe UI", 63, "bold"), bg="#121212", fg="#E1E1E1")
 title_label.pack(pady=15)
 
 style = ttk.Style()
-style.theme_use('clam')  # 'clam' theme allows color changes on Mac
+style.theme_use('clam')
 
 style.configure(
     "Custom.TButton",
     font=("Segoe UI", 31, "bold"),
-    background="#FFFCC6",       # Your custom hex background
-    foreground="black",         # Text color
+    background="#FFFCC6",
+    foreground="black",
     borderwidth=0,
     activeforeground="black",
     cursor="hand2"
 )
 
-# --- Action Buttons Layout Container ---
-# Added 'command=' to link buttons to the window functions
+# --- Primary Action Sidebar Dashboard ---
 regst = ttk.Button(root, text="Register", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
 shtbl = ttk.Button(root, text="Show Tables", style="Custom.TButton", width=15, command=open_tables_window)
-exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy) # Closes entire app
+exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
-# Packing elements
 regst.pack(anchor="w", padx=(40, 0), pady=(40, 45))
 srch.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 shtbl.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 
-# Center Vertical blue line separator
+# Center split line decorator
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
-vertical_line.place(
-    relx=0.5,
-    rely=0.2,
-    relheight=0.9,
-    anchor="n"
-)
+vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
 
-# Start application interaction engine tracking loops
 root.mainloop()
