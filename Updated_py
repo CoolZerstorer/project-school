@@ -17,11 +17,14 @@ def initialize_database():
         cursor = conn.cursor()
         cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
         cursor.execute("USE student_db;")
+        
+        # Updated table layout to properly match your form fields
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS students (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                grade VARCHAR(10) NOT NULL
+            CREATE TABLE IF NOT EXISTS books_issued (
+                book_id INT PRIMARY KEY,
+                student_name VARCHAR(100) NOT NULL,
+                date_of_issue VARCHAR(50) NOT NULL,
+                book_name VARCHAR(150) NOT NULL
             );
         """)
         conn.commit()
@@ -30,6 +33,7 @@ def initialize_database():
     except Error as e:
         print(f"Database initialization error: {e}")
 
+# Run setup immediately when script boots up
 initialize_database()
 
 
@@ -38,13 +42,11 @@ initialize_database()
 # ==========================================
 
 def open_register_window():
-    # Create the top level popup window
     reg_window = tk.Toplevel(root)
     reg_window.title("Register Student Book Issue")
     reg_window.geometry("600x550")
     reg_window.configure(bg="#1c1c1c")
     
-    # Title inside the popup
     tk.Label(
         reg_window, 
         text="Book Registration Form", 
@@ -53,11 +55,9 @@ def open_register_window():
         fg="#FFFCC6"
     ).pack(pady=25)
 
-    # Sub-container frame to hold form labels and entry fields cleanly
     form_frame = tk.Frame(reg_window, bg="#1c1c1c")
     form_frame.pack(padx=50, fill="x")
 
-    # Helper styling options for unified look
     lbl_opts = {"font": ("Segoe UI", 12), "bg": "#1c1c1c", "fg": "#E1E1E1", "anchor": "w"}
     ent_opts = {"font": ("Segoe UI", 12), "width": 30, "bg": "#2d2d2d", "fg": "white", "insertbackground": "white", "relief": "flat"}
 
@@ -81,38 +81,66 @@ def open_register_window():
     book_name_entry = tk.Entry(form_frame, **ent_opts)
     book_name_entry.grid(row=3, column=1, pady=8, padx=10)
 
-    # --- Button Logic Functions inside local scope ---
+    # DATABASE SUBMIT ACTION
     def submit_action():
-        # Quick validation check to show it functions, but does nothing to DB for now
         b_id = book_id_entry.get().strip()
         s_name = student_name_entry.get().strip()
+        d_issue = date_entry.get().strip()
+        b_name = book_name_entry.get().strip()
         
-        if not b_id or not s_name:
-            messagebox.showwarning("Form Notice", "Submit button clicked! Form data captured conceptually.")
-        else:
-            messagebox.showinfo("Form Action", f"Captured data for {s_name} signing out Book ID {b_id}!")
+        # Validation Check
+        if not b_id or not s_name or not d_issue or not b_name:
+            messagebox.showwarning("Missing Information", "Please fill out all fields before submitting!")
+            return
+        
+        # Check if Book ID is actually an integer
+        if not b_id.isdigit():
+            messagebox.showerror("Input Error", "Book ID must be a valid integer number!")
+            return
+
+        try:
+            conn = mysql.connector.connect(
+                host="127.0.0.1",
+                user="root",
+                password="root123456",
+                database="student_db"
+            )
+            cursor = conn.cursor()
+            
+            # Parametized insertion query for secure and seamless database writing
+            query = "INSERT INTO books_issued (book_id, student_name, date_of_issue, book_name) VALUES (%s, %s, %s, %s);"
+            cursor.execute(query, (int(b_id), s_name, d_issue, b_name))
+            conn.commit()
+            
+            messagebox.showinfo("Success", f"🎉 Successfully registered record for {s_name}!")
+            clear_action() # Wipe fields upon safe save
+            
+        except mysql.connector.Error as err:
+            # Handle situations like Duplicate Key Primary entry errors gracefully
+            messagebox.showerror("Database Error", f"Failed to save record: {err}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
 
     def clear_action():
-        # Deletes text content from index 0 to the very End of string
         book_id_entry.delete(0, tk.END)
         student_name_entry.delete(0, tk.END)
         date_entry.delete(0, tk.END)
         book_name_entry.delete(0, tk.END)
 
-    # --- Buttons Layout Container ---
     btn_frame = tk.Frame(reg_window, bg="#1c1c1c")
     btn_frame.pack(pady=40)
 
-    # Custom styles inside window for the form buttons
     submit_btn = tk.Button(
         btn_frame, text="Submit Data", font=("Segoe UI", 12, "bold"),
-        bg="#4CAF50", fg="black", width=15, height=1, relief="flat", command=submit_action
+        bg="#4CAF50", fg="black", width=15, relief="flat", command=submit_action
     )
     submit_btn.pack(side="left", padx=15)
 
     clear_btn = tk.Button(
         btn_frame, text="Clear Fields", font=("Segoe UI", 12, "bold"),
-        bg="#f44336", fg="black", width=15, height=1, relief="flat", command=clear_action
+        bg="#f44336", fg="black", width=15, relief="flat", command=clear_action
     )
     clear_btn.pack(side="left", padx=15)
 
@@ -124,12 +152,70 @@ def open_search_window():
     search_window.configure(bg="#1c1c1c")
     tk.Label(search_window, text="Search Records", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
 
+
+# SHOW TABLES WINDOW WITH DATA RENDERING
 def open_tables_window():
     tables_window = tk.Toplevel(root)
     tables_window.title("Database Tables")
-    tables_window.geometry("600x400")
+    tables_window.geometry("800x500")
     tables_window.configure(bg="#1c1c1c")
-    tk.Label(tables_window, text="View All Tables", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
+    
+    tk.Label(
+        tables_window, 
+        text="Issued Books Table Records", 
+        font=("Segoe UI", 20, "bold"), 
+        bg="#1c1c1c", 
+        fg="#FFFCC6"
+    ).pack(pady=15)
+
+    # 1. Define columns for Treeview component grid layout map
+    columns = ("book_id", "student_name", "date_of_issue", "book_name")
+    
+    # 2. Setup Treeview structure
+    tree = ttk.Treeview(tables_window, columns=columns, show="headings", height=15)
+    
+    # Define Column Headings
+    tree.heading("book_id", text="Book ID")
+    tree.heading("student_name", text="Student Name")
+    tree.heading("date_of_issue", text="Date of Issue")
+    tree.heading("book_name", text="Book Name")
+    
+    # Define Column Widths and alignment alignment formats
+    tree.column("book_id", width=100, anchor="center")
+    tree.column("student_name", width=200, anchor="w")
+    tree.column("date_of_issue", width=150, anchor="center")
+    tree.column("book_name", width=250, anchor="w")
+    
+    # Add scrollbars for handling extensive row lists safely
+    scrollbar = ttk.Scrollbar(tables_window, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    
+    # Pack Tree and Scrollbar components onto screen layout view blocks
+    tree.pack(side="left", fill="both", expand=True, padx=(20, 0), pady=10)
+    scrollbar.pack(side="right", fill="y", padx=(0, 20), pady=10)
+
+    # 3. Pull Data from MySQL database directly to populate the rows
+    try:
+        conn = mysql.connector.connect(
+            host="127.0.0.1",
+            user="root",
+            password="root123456",
+            database="student_db"
+        )
+        cursor = conn.cursor()
+        cursor.execute("SELECT book_id, student_name, date_of_issue, book_name FROM books_issued;")
+        rows = cursor.fetchall()
+        
+        # Inject records iteratively directly into UI window
+        for row in rows:
+            tree.insert("", tk.END, values=row)
+            
+    except Error as e:
+        messagebox.showerror("Fetch Error", f"Could not retrieve database rows: {e}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
 
 
 # ==========================================
