@@ -258,6 +258,7 @@ def open_tables_window():
 
 
 # ==========================================
+# ==========================================
 # 3. TKINTER MAIN INTERFACE AND LAYOUT
 # ==========================================
 
@@ -266,6 +267,7 @@ root.title("Library Unified Network Database")
 root.geometry("1080x640")
 root.configure(bg="#121212")
 
+# Title Screen Banner
 title_label = tk.Label(root, text="HOME", font=("Segoe UI", 63, "bold"), bg="#121212", fg="#E1E1E1")
 title_label.pack(pady=15)
 
@@ -282,9 +284,10 @@ style.configure(
     cursor="hand2"
 )
 
+# --- Primary Action Sidebar Dashboard (Left Side) ---
 regst = ttk.Button(root, text="Register", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
-shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
+shtbl = ttk.Button(root, text="Show Tables", style="Custom.TButton", width=15, command=open_tables_window)
 exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
 regst.pack(anchor="w", padx=(40, 0), pady=(40, 45))
@@ -292,7 +295,27 @@ srch.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 shtbl.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 
+# Center split line decorator
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
 vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
 
+# LUND IMAGE
+try:
+    # 1. Load the image from your VS Code workspace folder
+    home_image = tk.PhotoImage(file="img1.png")
+    
+    # 2. Place it inside a Label to display it on screen
+    image_label = tk.Label(root, image=home_image, bg="#121212")
+    
+    # 3. Position it on the right side using .place()
+    # relx=0.75 centers it horizontally within the right half of the window
+    image_label.place(relx=0.75, rely=0.55, anchor="center")
+    
+except Exception as e:
+    print(f"Error loading img1.png: {e}")
+    # Fallback message on the terminal if the file name or path is incorrect
+    print("Please verify that 'img1.png' is in the exact same folder open in VS Code.")
+
+
+# Start application interaction engine tracking loops
 root.mainloop()
