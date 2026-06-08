@@ -1,4 +1,3 @@
-
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
@@ -21,7 +20,6 @@ def initialize_database():
         cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
         cursor.execute("USE student_db;")
         
-        # Altered date_of_issue column to DATE type for mathematical calculations
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS books_issued (
                 book_id INT PRIMARY KEY,
@@ -74,7 +72,6 @@ def open_register_window():
     date_entry = tk.Entry(form_frame, **ent_opts)
     date_entry.grid(row=3, column=1, pady=8, padx=10)
     
-    # Automatically fill with current date to reduce user format mistakes
     date_entry.insert(0, datetime.today().strftime('%Y-%m-%d'))
 
     def submit_action():
@@ -91,7 +88,6 @@ def open_register_window():
             messagebox.showerror("Input Error", "Book ID must be a valid integer number!")
             return
             
-        # Validate exact date string input format
         try:
             datetime.strptime(d_issue, "%Y-%m-%d")
         except ValueError:
@@ -225,12 +221,11 @@ def open_search_window():
 def open_tables_window():
     tables_window = tk.Toplevel(root)
     tables_window.title("Database Tables")
-    tables_window.geometry("900x550") # Expanded slightly for the new data column and action layout button
+    tables_window.geometry("950x550") 
     tables_window.configure(bg="#1c1c1c")
     
     tk.Label(tables_window, text="Issued Books Table Records", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=15)
 
-    # Added Fine tracking column header metadata
     columns = ("book_id", "student_name", "date_of_issue", "book_name", "fine")
     tree = ttk.Treeview(tables_window, columns=columns, show="headings", height=12)
     
@@ -240,21 +235,19 @@ def open_tables_window():
     tree.heading("book_name", text="Book Name")
     tree.heading("fine", text="Accumulated Fine")
     
-    tree.column("book_id", width=80, anchor="center")
+    tree.column("book_id", width=100, anchor="center")
     tree.column("student_name", width=180, anchor="w")
-    tree.column("date_of_issue", width=120, anchor="center")
-    tree.column("book_name", width=200, anchor="w")
-    tree.column("fine", width=140, anchor="center")
+    tree.column("date_of_issue", width=140, anchor="center")
+    tree.column("book_name", width=220, anchor="w")
+    tree.column("fine", width=180, anchor="center")
     
     scrollbar = ttk.Scrollbar(tables_window, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
     
     tree.pack(side="top", fill="both", expand=True, padx=20, pady=10)
-    scrollbar.place(in_=tree, relx=1.0, relheight=1.0, bor=0, anchor="ne")
+    scrollbar.pack(side="right", fill="y")
 
-    # Helper logic function to load records and execute date comparison
     def load_table_records():
-        # Clear existing items first
         for item in tree.get_children():
             tree.delete(item)
             
@@ -269,17 +262,23 @@ def open_tables_window():
             for row in rows:
                 b_id, s_name, issue_date, b_name = row
                 
-                # Check delta difference between registration day and execution context date
-                days_passed = (today - issue_date).days
+                # Dynamic datetime calculation logic
+                if isinstance(issue_date, str):
+                    # Fallback context in case string formats leaked inside the DB
+                    issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
+                else:
+                    issue_date_obj = issue_date
+
+                days_passed = (today - issue_date_obj).days
                 
-                # 15 days grace period buffer calculation formula
                 if days_passed > 15:
                     fine_amt = (days_passed - 15) * 100
                     fine_str = f"₹{fine_amt} ({days_passed - 15} days overdue)"
                 else:
                     fine_str = "₹0 (Safe)"
-                    
-                tree.insert("", tk.END, values=(b_id, s_name, issue_date.strftime('%Y-%m-%d'), b_name, fine_str))
+                
+                # FIXED: Structural 5-value array matching schema configuration mapping properties
+                tree.insert("", tk.END, values=(b_id, s_name, issue_date_obj.strftime('%Y-%m-%d'), b_name, fine_str))
         except Error as e:
             messagebox.showerror("Fetch Error", f"Could not retrieve database rows: {e}")
         finally:
@@ -287,7 +286,6 @@ def open_tables_window():
                 cursor.close()
                 conn.close()
 
-    # Deletes item entirely from storage configuration table mappings
     def clear_selected_record():
         selected_item = tree.selection()
         if not selected_item:
@@ -309,7 +307,7 @@ def open_tables_window():
             conn.commit()
             
             messagebox.showinfo("Returned Successfully", "Record wiped clean. Book is available in inventory once again.")
-            load_table_records() # Refresh live data tree
+            load_table_records() 
         except Error as e:
             messagebox.showerror("Database Execution Error", f"Could not modify entry schema indices: {e}")
         finally:
@@ -317,14 +315,12 @@ def open_tables_window():
                 cursor.close()
                 conn.close()
 
-    # Interactive control dashboard button layout placement
     btn_control_frame = tk.Frame(tables_window, bg="#1c1c1c")
     btn_control_frame.pack(pady=15)
     
     return_btn = tk.Button(btn_control_frame, text="Mark Selected as Returned / Clear Record", font=("Segoe UI", 12, "bold"), bg="#4CAF50", fg="black", relief="flat", padx=15, pady=5, command=clear_selected_record)
     return_btn.pack()
 
-    # Populate initial load calculation loop immediately
     load_table_records()
 
 
@@ -353,7 +349,7 @@ style.configure(
     cursor="hand2"
 )
 
-# --- Primary Action Sidebar Dashboard (Left Side) ---
+# --- Sidebar ---
 regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
 shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
@@ -364,11 +360,10 @@ srch.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 shtbl.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 
-# Center split line decorator
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
 vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
 
-# --- IMAGE 1 (Top Corner Decorator Icon) ---
+# --- IMAGE 1 ---
 try:
     pil_img1 = Image.open("img1.png")
     pil_img1 = pil_img1.resize((80, 80), Image.Resampling.LANCZOS) 
@@ -377,11 +372,10 @@ try:
     image_label = tk.Label(root, image=home_image, bg="#121212")
     image_label.place(relx=0.98, rely=0.024, anchor="ne")
     image_label.image = home_image
-
 except Exception as e:
     print(f"Error loading img1.png: {e}") 
 
-# --- IMAGE 2 (Library Main Screen Graphic) ---
+# --- IMAGE 2 ---
 try:
     pil_lib = Image.open("lib.png")
     pil_lib = pil_lib.resize((400, 300), Image.Resampling.LANCZOS)
@@ -390,9 +384,7 @@ try:
     lib_image_label = tk.Label(root, image=lib_image, bg="#121212")
     lib_image_label.place(relx=0.75, rely=0.55, anchor="center")
     lib_image_label.image = lib_image
-
 except Exception as e:
     print(f"Error loading lib.png: {e}") 
 
 root.mainloop()
-
