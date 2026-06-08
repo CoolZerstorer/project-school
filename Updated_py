@@ -1,8 +1,14 @@
+Here is the complete, updated script. I have integrated the **Pillow** library to handle the image loading and resizing. This forces both images to explicitly constrained dimensions ($80\times80$ for the icon and $400\times300$ for the library graphic) so they fit perfectly inside your interface and don't render off-screen.
+
+Make sure you run `pip install pillow` in your terminal before running this script.
+
+```python
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 import mysql.connector
 from mysql.connector import Error
+from PIL import Image, ImageTk  # Handles image formatting and exact resizing safely
 
 # ==========================================
 # 1. DATABASE SETUP LOGIC
@@ -288,28 +294,40 @@ exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
 vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
 
-# First IMAGE (Top Right Corner)
+# --- IMAGE 1 (Top Corner Decorator Icon) ---
 try:
-    raw_image1 = tk.PhotoImage(file="img1.png")
-    scale_factor1 = 5
-    home_image = raw_image1.subsample(scale_factor1, scale_factor1)
-    
+    pil_img1 = Image.open("img1.png")
+    # Forces asset down into an explicit icon box size
+    pil_img1 = pil_img1.resize((80, 80), Image.Resampling.LANCZOS) 
+    home_image = ImageTk.PhotoImage(pil_img1)
+
     image_label = tk.Label(root, image=home_image, bg="#121212")
-    image_label.place(relx=0.95, rely=0.024, anchor="ne") # Adjusted relx slightly to move away from text
+    image_label.place(relx=0.98, rely=0.024, anchor="ne")
+    
+    # Internal component registration lock
+    image_label.image = home_image
+
 except Exception as e:
     print(f"Error loading img1.png: {e}") 
 
-# Second IMAGE (Library Image - Center of the right-hand panel)
+# --- IMAGE 2 (Library Main Screen Graphic) ---
 try:
-    raw_image2 = tk.PhotoImage(file="lib.png")
-    scale_factor2 = 2
-    lib_image = raw_image2.subsample(scale_factor2, scale_factor2)
+    pil_lib = Image.open("lib.png")
+    
+    # FORCED GEOMETRY: Confines your graphic dimension box to work with window limits
+    pil_lib = pil_lib.resize((400, 300), Image.Resampling.LANCZOS)
+    lib_image = ImageTk.PhotoImage(pil_lib)
 
     lib_image_label = tk.Label(root, image=lib_image, bg="#121212")
-    # Centered nicely on the empty right side of your dashboard
+    # Perfectly centers it in the empty right panel space
     lib_image_label.place(relx=0.75, rely=0.55, anchor="center")
+
+    # Internal component registration lock
+    lib_image_label.image = lib_image
 
 except Exception as e:
     print(f"Error loading lib.png: {e}") 
 
 root.mainloop()
+
+```
