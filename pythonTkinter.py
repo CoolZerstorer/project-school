@@ -1,8 +1,10 @@
+
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 import mysql.connector
 from mysql.connector import Error
+from PIL import Image, ImageTk  # Handles image formatting and exact resizing safely
 
 # ==========================================
 # 1. DATABASE SETUP LOGIC
@@ -43,7 +45,7 @@ initialize_database()
 def open_register_window():
     reg_window = tk.Toplevel(root)
     reg_window.title("Register Student Book Issue")
-    reg_window.geometry("600x550")
+    reg_window.geometry("500x400")
     reg_window.configure(bg="#1c1c1c")
     
     tk.Label(reg_window, text="Book Registration Form", font=("Segoe UI", 24, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=25)
@@ -115,15 +117,12 @@ def open_register_window():
     clear_btn.pack(side="left", padx=15)
 
 
-# NEW SEARCH WINDOW WITH DICTIONARY AND LIVE DB AVAILABILITY CHECK
 def open_search_window():
     search_window = tk.Toplevel(root)
     search_window.title("Search Library Database")
     search_window.geometry("650x450")
     search_window.configure(bg="#1c1c1c")
     
-    # 1. Your Dictionary Concept (Key: Book ID (int), Value: Book Name (str))
-    # Filled with 3 mock data examples so you can test immediately. You can keep it empty {} if you want!
     books_dict = {
         101: "Lord of the rings",
         102: "The great gatsby",
@@ -137,7 +136,6 @@ def open_search_window():
     
     tk.Label(search_window, text="Search Book Inventory", font=("Segoe UI", 22, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
     
-    # Search Input Field Setup
     search_frame = tk.Frame(search_window, bg="#1c1c1c")
     search_frame.pack(pady=10)
     
@@ -145,7 +143,6 @@ def open_search_window():
     search_entry = tk.Entry(search_frame, font=("Segoe UI", 12), width=25, bg="#2d2d2d", fg="white", insertbackground="white", relief="flat")
     search_entry.grid(row=0, column=1, padx=10)
     
-    # Display Result Area Labels
     result_frame = tk.LabelFrame(search_window, text=" Search Results ", font=("Segoe UI", 11, "bold"), bg="#1c1c1c", fg="#FFFCC6", bd=2, relief="groove")
     result_frame.pack(pady=30, padx=40, fill="both", expand=True)
     
@@ -160,7 +157,6 @@ def open_search_window():
     status_result_lbl = tk.Label(result_frame, text="Availability Status: --", fg="white", **lbl_res_opts)
     status_result_lbl.pack(fill="x", padx=20, pady=5)
 
-    # Search Execution Logic
     def perform_search():
         query_name = search_entry.get().strip().lower()
         
@@ -171,27 +167,22 @@ def open_search_window():
         found_id = None
         found_name = None
         
-        # Look through the dictionary keys and values
         for b_id, b_name in books_dict.items():
             if b_name.lower() == query_name:
                 found_id = b_id
                 found_name = b_name
                 break
         
-        # If not found in dictionary
         if found_id is None:
             id_result_lbl.config(text="Book ID: Not Found", fg="#f44336")
             name_result_lbl.config(text=f"Book Name: '{search_entry.get()}' missing from catalog", fg="#f44336")
             status_result_lbl.config(text="Availability Status: Unknown", fg="#f44336")
             return
         
-        # If found in dictionary, check its live MySQL assignment status
         is_issued = False
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
-            
-            # Check if this exact Book ID exists in the database table
             cursor.execute("SELECT book_id FROM books_issued WHERE book_id = %s;", (found_id,))
             record = cursor.fetchone()
             
@@ -205,7 +196,6 @@ def open_search_window():
                 cursor.close()
                 conn.close()
                 
-        # Update UI results beautifully based on database reflection
         id_result_lbl.config(text=f"Book ID: {found_id}", fg="white")
         name_result_lbl.config(text=f"Book Name: {found_name}", fg="white")
         
@@ -214,7 +204,6 @@ def open_search_window():
         else:
             status_result_lbl.config(text="Availability Status: AVAILABLE", fg="#4caf50")
 
-    # Connect Search Button to function
     search_btn = tk.Button(search_frame, text="Search", font=("Segoe UI", 11, "bold"), bg="#FFFCC6", fg="black", command=perform_search, relief="flat", width=10)
     search_btn.grid(row=0, column=2, padx=10)
 
@@ -262,7 +251,6 @@ def open_tables_window():
 
 
 # ==========================================
-# ==========================================
 # 3. TKINTER MAIN INTERFACE AND LAYOUT
 # ==========================================
 
@@ -271,7 +259,6 @@ root.title("Library Unified Network Database")
 root.geometry("1080x640")
 root.configure(bg="#121212")
 
-# Title Screen Banner
 title_label = tk.Label(root, text="HOME", font=("Segoe UI", 63, "bold"), bg="#121212", fg="#E1E1E1")
 title_label.pack(pady=15)
 
@@ -303,39 +290,39 @@ exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
 vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
 
-#IMAGE
+# --- IMAGE 1 (Top Corner Decorator Icon) ---
 try:
-    raw_image = tk.PhotoImage(file="img1.png")
-
-    scale_factor = 5
-    home_image = raw_image.subsample(scale_factor, scale_factor)
-
+    pil_img1 = Image.open("img1.png")
+    # Forces asset down into an explicit icon box size
+    pil_img1 = pil_img1.resize((120, 90), Image.Resampling.LANCZOS) 
+    home_image = ImageTk.PhotoImage(pil_img1)
 
     image_label = tk.Label(root, image=home_image, bg="#121212")
-
-
     image_label.place(relx=0.71, rely=0.024, anchor="ne")
+    
+    # Internal component registration lock
+    image_label.image = home_image
 
 except Exception as e:
     print(f"Error loading img1.png: {e}") 
 
-# library IMAGE
+# --- IMAGE 2 (Library Main Screen Graphic) ---
 try:
-    raw_image2 = tk.PhotoImage(file="lib.png")
+    pil_lib = Image.open("lib.png")
+    
+    # FORCED GEOMETRY: Confines your graphic dimension box to work with window limits
+    pil_lib = pil_lib.resize((400, 300), Image.Resampling.LANCZOS)
+    lib_image = ImageTk.PhotoImage(pil_lib)
 
-    scale_factor = 2
-    home_image = raw_image2.subsample(scale_factor, scale_factor)
+    lib_image_label = tk.Label(root, image=lib_image, bg="#121212")
+    # Perfectly centers it in the empty right panel space
+    lib_image_label.place(relx=0.75, rely=0.55, anchor="center")
 
-
-    image_label = tk.Label(root, image=home_image, bg="#121212")
-
-
-    image_label.place(relx=0.5, rely=0.5, anchor="s")
+    # Internal component registration lock
+    lib_image_label.image = lib_image
 
 except Exception as e:
-    print(f"Error loading img1.png: {e}") 
-
-# Start application interaction engine tracking loops
-root.mainloop()
+    print(f"Error loading lib.png: {e}") 
 
 root.mainloop()
+
