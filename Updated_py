@@ -1,4 +1,4 @@
-```python
+
 import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
@@ -396,4 +396,3 @@ except Exception as e:
 
 root.mainloop()
 
-```
