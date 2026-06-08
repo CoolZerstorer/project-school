@@ -1,5 +1,4 @@
 import tkinter as tk
-from tkinter import messageboximport tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 import mysql.connector
@@ -213,226 +212,6 @@ def open_tables_window():
     tables_window.geometry("800x500")
     tables_window.configure(bg="#1c1c1c")
     
-    tk.Label(tables_window, text="Issued Books Table Records", font=("Segoe UI", 20, "bold"), bg="#1c1c
-# ==========================================
-def initialize_database():
-    try:
-        conn = mysql.connector.connect(
-            host="127.0.0.1",
-            user="root",
-            password="root123456"
-        )
-        cursor = conn.cursor()
-        cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
-        cursor.execute("USE student_db;")
-        
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS books_issued (
-                book_id INT PRIMARY KEY,
-                student_name VARCHAR(100) NOT NULL,
-                date_of_issue VARCHAR(50) NOT NULL,
-                book_name VARCHAR(150) NOT NULL
-            );
-        """)
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Error as e:
-        print(f"Database initialization error: {e}")
-
-# Run setup immediately when script boots up
-initialize_database()
-
-
-# ==========================================
-# 2. WINDOW OPENING FUNCTIONS
-# ==========================================
-
-def open_register_window():
-    reg_window = tk.Toplevel(root)
-    reg_window.title("Register Student Book Issue")
-    reg_window.geometry("600x550")
-    reg_window.configure(bg="#1c1c1c")
-    
-    tk.Label(reg_window, text="Book Registration Form", font=("Segoe UI", 24, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=25)
-
-    form_frame = tk.Frame(reg_window, bg="#1c1c1c")
-    form_frame.pack(padx=50, fill="x")
-
-    lbl_opts = {"font": ("Segoe UI", 13), "bg": "#1c1c1c", "fg": "#E1E1E1", "anchor": "w"}
-    ent_opts = {"font": ("Segoe UI", 13), "width": 30, "bg": "#2d2d2d", "fg": "white", "insertbackground": "white", "relief": "flat"}
-
-    tk.Label(form_frame, text="Book ID :", **lbl_opts).grid(row=0, column=0, sticky="w", pady=8)
-    book_id_entry = tk.Entry(form_frame, **ent_opts)
-    book_id_entry.grid(row=0, column=1, pady=8, padx=10)
-
-    tk.Label(form_frame, text="Book Name:", **lbl_opts).grid(row=3, column=0, sticky="w", pady=8)
-    book_name_entry = tk.Entry(form_frame, **ent_opts)
-    book_name_entry.grid(row=2, column=1, pady=8, padx=10)
-
-    tk.Label(form_frame, text="Student Name:", **lbl_opts).grid(row=1, column=0, sticky="w", pady=8)
-    student_name_entry = tk.Entry(form_frame, **ent_opts)
-    student_name_entry.grid(row=1, column=1, pady=8, padx=10)
-
-    tk.Label(form_frame, text="Date of Issue:", **lbl_opts).grid(row=2, column=0, sticky="w", pady=8)
-    date_entry = tk.Entry(form_frame, **ent_opts)
-    date_entry.grid(row=3, column=1, pady=8, padx=10)
-
-    def submit_action():
-        b_id = book_id_entry.get().strip()
-        s_name = student_name_entry.get().strip()
-        b_name = book_name_entry.get().strip()
-        d_issue = date_entry.get().strip()
-        if not b_id or not s_name or not d_issue or not b_name:
-            messagebox.showwarning("Missing Information", "Please fill out all fields before submitting!")
-            return
-        
-        if not b_id.isdigit():
-            messagebox.showerror("Input Error", "Book ID must be a valid integer number!")
-            return
-
-        try:
-            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
-            cursor = conn.cursor()
-            query = "INSERT INTO books_issued (book_id, student_name, date_of_issue, book_name) VALUES (%s, %s, %s, %s);"
-            cursor.execute(query, (int(b_id), s_name, d_issue, b_name))
-            conn.commit()
-            
-            messagebox.showinfo("Success", f"Successfully registered record for {s_name}!")
-            clear_action()
-        except mysql.connector.Error as err:
-            messagebox.showerror("Database Error", f"Failed to save record: {err}")
-        finally:
-            if 'conn' in locals() and conn.is_connected():
-                cursor.close()
-                conn.close()
-
-    def clear_action():
-        book_id_entry.delete(0, tk.END)
-        student_name_entry.delete(0, tk.END)
-        date_entry.delete(0, tk.END)
-        book_name_entry.delete(0, tk.END)
-
-    btn_frame = tk.Frame(reg_window, bg="#1c1c1c")
-    btn_frame.pack(pady=40)
-
-    submit_btn = tk.Button(btn_frame, text="Submit Data", font=("Segoe UI", 13, "bold"), bg="#4CAF50", fg="black", activeforeground="#0022FF",width=15, relief="flat", command=submit_action)
-    submit_btn.pack(side="left", padx=15)
-
-    clear_btn = tk.Button(btn_frame, text="Clear Fields", font=("Segoe UI", 13, "bold"), bg="#f44336", fg="black", activeforeground="#0929F9",width=15, relief="flat", command=clear_action)
-    clear_btn.pack(side="left", padx=15)
-
-
-# NEW SEARCH WINDOW WITH DICTIONARY AND LIVE DB AVAILABILITY CHECK
-def open_search_window():
-    search_window = tk.Toplevel(root)
-    search_window.title("Search Library Database")
-    search_window.geometry("650x450")
-    search_window.configure(bg="#1c1c1c")
-    
-    # 1. Your Dictionary Concept (Key: Book ID (int), Value: Book Name (str))
-    # Filled with 3 mock data examples so you can test immediately. You can keep it empty {} if you want!
-    books_dict = {
-        101: "Lord of the rings",
-        102: "The great gatsby",
-        103: "To Kill a Mockingbird",
-        104: "1984",
-        105: "Pride and Prejudice",
-        106: "The Catcher in the Rye",
-        107: "The Hobbit",
-        108: "Fahrenheit 451"
-    }
-    
-    tk.Label(search_window, text="Search Book Inventory", font=("Segoe UI", 22, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
-    
-    # Search Input Field Setup
-    search_frame = tk.Frame(search_window, bg="#1c1c1c")
-    search_frame.pack(pady=10)
-    
-    tk.Label(search_frame, text="Enter Book Name:", font=("Segoe UI", 12), bg="#1c1c1c", fg="#E1E1E1").grid(row=0, column=0, padx=10, sticky="w")
-    search_entry = tk.Entry(search_frame, font=("Segoe UI", 12), width=25, bg="#2d2d2d", fg="white", insertbackground="white", relief="flat")
-    search_entry.grid(row=0, column=1, padx=10)
-    
-    # Display Result Area Labels
-    result_frame = tk.LabelFrame(search_window, text=" Search Results ", font=("Segoe UI", 11, "bold"), bg="#1c1c1c", fg="#FFFCC6", bd=2, relief="groove")
-    result_frame.pack(pady=30, padx=40, fill="both", expand=True)
-    
-    lbl_res_opts = {"font": ("Segoe UI", 13), "bg": "#1c1c1c", "anchor": "w"}
-    
-    id_result_lbl = tk.Label(result_frame, text="Book ID: --", fg="white", **lbl_res_opts)
-    id_result_lbl.pack(fill="x", padx=20, pady=5)
-    
-    name_result_lbl = tk.Label(result_frame, text="Book Name: --", fg="white", **lbl_res_opts)
-    name_result_lbl.pack(fill="x", padx=20, pady=5)
-    
-    status_result_lbl = tk.Label(result_frame, text="Availability Status: --", fg="white", **lbl_res_opts)
-    status_result_lbl.pack(fill="x", padx=20, pady=5)
-
-    # Search Execution Logic
-    def perform_search():
-        query_name = search_entry.get().strip().lower()
-        
-        if not query_name:
-            messagebox.showwarning("Search Warning", "Please enter a book name to search!")
-            return
-        
-        found_id = None
-        found_name = None
-        
-        # Look through the dictionary keys and values
-        for b_id, b_name in books_dict.items():
-            if b_name.lower() == query_name:
-                found_id = b_id
-                found_name = b_name
-                break
-        
-        # If not found in dictionary
-        if found_id is None:
-            id_result_lbl.config(text="Book ID: Not Found", fg="#f44336")
-            name_result_lbl.config(text=f"Book Name: '{search_entry.get()}' missing from catalog", fg="#f44336")
-            status_result_lbl.config(text="Availability Status: Unknown", fg="#f44336")
-            return
-        
-        # If found in dictionary, check its live MySQL assignment status
-        is_issued = False
-        try:
-            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
-            cursor = conn.cursor()
-            
-            # Check if this exact Book ID exists in the database table
-            cursor.execute("SELECT book_id FROM books_issued WHERE book_id = %s;", (found_id,))
-            record = cursor.fetchone()
-            
-            if record:
-                is_issued = True
-                
-        except Error as e:
-            print(f"Database read error during check: {e}")
-        finally:
-            if 'conn' in locals() and conn.is_connected():
-                cursor.close()
-                conn.close()
-                
-        # Update UI results beautifully based on database reflection
-        id_result_lbl.config(text=f"Book ID: {found_id}", fg="white")
-        name_result_lbl.config(text=f"Book Name: {found_name}", fg="white")
-        
-        if is_issued:
-            status_result_lbl.config(text="Availability Status: NOT AVAILABLE (Already Registered/Issued)", fg="#ff6b6b")
-        else:
-            status_result_lbl.config(text="Availability Status: AVAILABLE", fg="#4caf50")
-
-    # Connect Search Button to function
-    search_btn = tk.Button(search_frame, text="Search", font=("Segoe UI", 11, "bold"), bg="#FFFCC6", fg="black", command=perform_search, relief="flat", width=10)
-    search_btn.grid(row=0, column=2, padx=10)
-
-
-def open_tables_window():
-    tables_window = tk.Toplevel(root)
-    tables_window.title("Database Tables")
-    tables_window.geometry("800x500")
-    tables_window.configure(bg="#1c1c1c")
-    
     tk.Label(tables_window, text="Issued Books Table Records", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=15)
 
     columns = ("book_id", "student_name", "date_of_issue", "book_name")
@@ -470,7 +249,6 @@ def open_tables_window():
 
 
 # ==========================================
-# ==========================================
 # 3. TKINTER MAIN INTERFACE AND LAYOUT
 # ==========================================
 
@@ -479,7 +257,6 @@ root.title("Library Unified Network Database")
 root.geometry("1080x640")
 root.configure(bg="#121212")
 
-# Title Screen Banner
 title_label = tk.Label(root, text="HOME", font=("Segoe UI", 63, "bold"), bg="#121212", fg="#E1E1E1")
 title_label.pack(pady=15)
 
@@ -511,37 +288,28 @@ exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
 vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
 
-#IMAGE
+# First IMAGE (Top Right Corner)
 try:
-    raw_image = tk.PhotoImage(file="img1.png")
-
-    scale_factor = 5
-    home_image = raw_image.subsample(scale_factor, scale_factor)
-
-
+    raw_image1 = tk.PhotoImage(file="img1.png")
+    scale_factor1 = 5
+    home_image = raw_image1.subsample(scale_factor1, scale_factor1)
+    
     image_label = tk.Label(root, image=home_image, bg="#121212")
-
-
-    image_label.place(relx=0.71, rely=0.024, anchor="ne")
-
+    image_label.place(relx=0.95, rely=0.024, anchor="ne") # Adjusted relx slightly to move away from text
 except Exception as e:
     print(f"Error loading img1.png: {e}") 
 
-# library IMAGE
+# Second IMAGE (Library Image - Center of the right-hand panel)
 try:
-    raw_image = tk.PhotoImage(file="lib.png")
+    raw_image2 = tk.PhotoImage(file="lib.png")
+    scale_factor2 = 2
+    lib_image = raw_image2.subsample(scale_factor2, scale_factor2)
 
-    scale_factor = 2
-    home_image = raw_image.subsample(scale_factor, scale_factor)
-
-
-    image_label = tk.Label(root, image=home_image, bg="#121212")
-
-
-    image_label.place(relx=0.5, rely=0.5, anchor="s")
+    lib_image_label = tk.Label(root, image=lib_image, bg="#121212")
+    # Centered nicely on the empty right side of your dashboard
+    lib_image_label.place(relx=0.75, rely=0.55, anchor="center")
 
 except Exception as e:
-    print(f"Error loading img1.png: {e}") 
+    print(f"Error loading lib.png: {e}") 
 
-# Start application interaction engine tracking loops
 root.mainloop()
