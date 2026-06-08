@@ -9,24 +9,21 @@ from mysql.connector import Error
 # ==========================================
 def initialize_database():
     try:
-        # Connect to the general server landing pad using your working password
         conn = mysql.connector.connect(
-            host="",
-            user="",
-            password=""
+            host="127.0.0.1",
+            user="root",
+            password="root123456"
         )
         cursor = conn.cursor()
-        
-        # Create and select the database room
         cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
         cursor.execute("USE student_db;")
         
-        # Build the physical storage table layout
         cursor.execute("""
-            CREATE TABLE IF NOT EXISTS students (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                name VARCHAR(100) NOT NULL,
-                grade VARCHAR(10) NOT NULL
+            CREATE TABLE IF NOT EXISTS books_issued (
+                book_id INT PRIMARY KEY,
+                student_name VARCHAR(100) NOT NULL,
+                date_of_issue VARCHAR(50) NOT NULL,
+                book_name VARCHAR(150) NOT NULL
             );
         """)
         conn.commit()
@@ -35,113 +32,310 @@ def initialize_database():
     except Error as e:
         print(f"Database initialization error: {e}")
 
-# Run setup immediately when script boots up to ensure DB exists
+# Run setup immediately when script boots up
 initialize_database()
 
 
 # ==========================================
-# 2. BUTTON CLICK ACTION FUNCTIONS
+# 2. WINDOW OPENING FUNCTIONS
 # ==========================================
-'''
-def submit_student_data():
-    """Triggered when user clicks 'Save Student Info'"""
-    student_name = name_entry.get().strip()
-    student_grade = grade_entry.get().strip()
+
+def open_register_window():
+    reg_window = tk.Toplevel(root)
+    reg_window.title("Register Student Book Issue")
+    reg_window.geometry("600x550")
+    reg_window.configure(bg="#1c1c1c")
     
-    # Validation checklist guard rail
-    if not student_name or not student_grade:
-        messagebox.showwarning("Missing Information", "Please fill out both Name and Grade fields!")
-        return
+    tk.Label(reg_window, text="Book Registration Form", font=("Segoe UI", 24, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=25)
+
+    form_frame = tk.Frame(reg_window, bg="#1c1c1c")
+    form_frame.pack(padx=50, fill="x")
+
+    lbl_opts = {"font": ("Segoe UI", 13), "bg": "#1c1c1c", "fg": "#E1E1E1", "anchor": "w"}
+    ent_opts = {"font": ("Segoe UI", 13), "width": 30, "bg": "#2d2d2d", "fg": "white", "insertbackground": "white", "relief": "flat"}
+
+    tk.Label(form_frame, text="Book ID :", **lbl_opts).grid(row=0, column=0, sticky="w", pady=8)
+    book_id_entry = tk.Entry(form_frame, **ent_opts)
+    book_id_entry.grid(row=0, column=1, pady=8, padx=10)
+
+    tk.Label(form_frame, text="Book Name:", **lbl_opts).grid(row=3, column=0, sticky="w", pady=8)
+    book_name_entry = tk.Entry(form_frame, **ent_opts)
+    book_name_entry.grid(row=2, column=1, pady=8, padx=10)
+
+    tk.Label(form_frame, text="Student Name:", **lbl_opts).grid(row=1, column=0, sticky="w", pady=8)
+    student_name_entry = tk.Entry(form_frame, **ent_opts)
+    student_name_entry.grid(row=1, column=1, pady=8, padx=10)
+
+    tk.Label(form_frame, text="Date of Issue:", **lbl_opts).grid(row=2, column=0, sticky="w", pady=8)
+    date_entry = tk.Entry(form_frame, **ent_opts)
+    date_entry.grid(row=3, column=1, pady=8, padx=10)
+
+    def submit_action():
+        b_id = book_id_entry.get().strip()
+        s_name = student_name_entry.get().strip()
+        b_name = book_name_entry.get().strip()
+        d_issue = date_entry.get().strip()
+        if not b_id or not s_name or not d_issue or not b_name:
+            messagebox.showwarning("Missing Information", "Please fill out all fields before submitting!")
+            return
+        
+        if not b_id.isdigit():
+            messagebox.showerror("Input Error", "Book ID must be a valid integer number!")
+            return
+
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            query = "INSERT INTO books_issued (book_id, student_name, date_of_issue, book_name) VALUES (%s, %s, %s, %s);"
+            cursor.execute(query, (int(b_id), s_name, d_issue, b_name))
+            conn.commit()
+            
+            messagebox.showinfo("Success", f"Successfully registered record for {s_name}!")
+            clear_action()
+        except mysql.connector.Error as err:
+            messagebox.showerror("Database Error", f"Failed to save record: {err}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    def clear_action():
+        book_id_entry.delete(0, tk.END)
+        student_name_entry.delete(0, tk.END)
+        date_entry.delete(0, tk.END)
+        book_name_entry.delete(0, tk.END)
+
+    btn_frame = tk.Frame(reg_window, bg="#1c1c1c")
+    btn_frame.pack(pady=40)
+
+    submit_btn = tk.Button(btn_frame, text="Submit Data", font=("Segoe UI", 13, "bold"), bg="#4CAF50", fg="black", activeforeground="#0022FF",width=15, relief="flat", command=submit_action)
+    submit_btn.pack(side="left", padx=15)
+
+    clear_btn = tk.Button(btn_frame, text="Clear Fields", font=("Segoe UI", 13, "bold"), bg="#f44336", fg="black", activeforeground="#0929F9",width=15, relief="flat", command=clear_action)
+    clear_btn.pack(side="left", padx=15)
+
+
+# NEW SEARCH WINDOW WITH DICTIONARY AND LIVE DB AVAILABILITY CHECK
+def open_search_window():
+    search_window = tk.Toplevel(root)
+    search_window.title("Search Library Database")
+    search_window.geometry("650x450")
+    search_window.configure(bg="#1c1c1c")
+    
+    # 1. Your Dictionary Concept (Key: Book ID (int), Value: Book Name (str))
+    # Filled with 3 mock data examples so you can test immediately. You can keep it empty {} if you want!
+    books_dict = {
+        101: "Lord of the rings",
+        102: "The great gatsby",
+        103: "To Kill a Mockingbird",
+        104: "1984",
+        105: "Pride and Prejudice",
+        106: "The Catcher in the Rye",
+        107: "The Hobbit",
+        108: "Fahrenheit 451"
+    }
+    
+    tk.Label(search_window, text="Search Book Inventory", font=("Segoe UI", 22, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
+    
+    # Search Input Field Setup
+    search_frame = tk.Frame(search_window, bg="#1c1c1c")
+    search_frame.pack(pady=10)
+    
+    tk.Label(search_frame, text="Enter Book Name:", font=("Segoe UI", 12), bg="#1c1c1c", fg="#E1E1E1").grid(row=0, column=0, padx=10, sticky="w")
+    search_entry = tk.Entry(search_frame, font=("Segoe UI", 12), width=25, bg="#2d2d2d", fg="white", insertbackground="white", relief="flat")
+    search_entry.grid(row=0, column=1, padx=10)
+    
+    # Display Result Area Labels
+    result_frame = tk.LabelFrame(search_window, text=" Search Results ", font=("Segoe UI", 11, "bold"), bg="#1c1c1c", fg="#FFFCC6", bd=2, relief="groove")
+    result_frame.pack(pady=30, padx=40, fill="both", expand=True)
+    
+    lbl_res_opts = {"font": ("Segoe UI", 13), "bg": "#1c1c1c", "anchor": "w"}
+    
+    id_result_lbl = tk.Label(result_frame, text="Book ID: --", fg="white", **lbl_res_opts)
+    id_result_lbl.pack(fill="x", padx=20, pady=5)
+    
+    name_result_lbl = tk.Label(result_frame, text="Book Name: --", fg="white", **lbl_res_opts)
+    name_result_lbl.pack(fill="x", padx=20, pady=5)
+    
+    status_result_lbl = tk.Label(result_frame, text="Availability Status: --", fg="white", **lbl_res_opts)
+    status_result_lbl.pack(fill="x", padx=20, pady=5)
+
+    # Search Execution Logic
+    def perform_search():
+        query_name = search_entry.get().strip().lower()
+        
+        if not query_name:
+            messagebox.showwarning("Search Warning", "Please enter a book name to search!")
+            return
+        
+        found_id = None
+        found_name = None
+        
+        # Look through the dictionary keys and values
+        for b_id, b_name in books_dict.items():
+            if b_name.lower() == query_name:
+                found_id = b_id
+                found_name = b_name
+                break
+        
+        # If not found in dictionary
+        if found_id is None:
+            id_result_lbl.config(text="Book ID: Not Found", fg="#f44336")
+            name_result_lbl.config(text=f"Book Name: '{search_entry.get()}' missing from catalog", fg="#f44336")
+            status_result_lbl.config(text="Availability Status: Unknown", fg="#f44336")
+            return
+        
+        # If found in dictionary, check its live MySQL assignment status
+        is_issued = False
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            
+            # Check if this exact Book ID exists in the database table
+            cursor.execute("SELECT book_id FROM books_issued WHERE book_id = %s;", (found_id,))
+            record = cursor.fetchone()
+            
+            if record:
+                is_issued = True
+                
+        except Error as e:
+            print(f"Database read error during check: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+                
+        # Update UI results beautifully based on database reflection
+        id_result_lbl.config(text=f"Book ID: {found_id}", fg="white")
+        name_result_lbl.config(text=f"Book Name: {found_name}", fg="white")
+        
+        if is_issued:
+            status_result_lbl.config(text="Availability Status: NOT AVAILABLE (Already Registered/Issued)", fg="#ff6b6b")
+        else:
+            status_result_lbl.config(text="Availability Status: AVAILABLE", fg="#4caf50")
+
+    # Connect Search Button to function
+    search_btn = tk.Button(search_frame, text="Search", font=("Segoe UI", 11, "bold"), bg="#FFFCC6", fg="black", command=perform_search, relief="flat", width=10)
+    search_btn.grid(row=0, column=2, padx=10)
+
+
+def open_tables_window():
+    tables_window = tk.Toplevel(root)
+    tables_window.title("Database Tables")
+    tables_window.geometry("800x500")
+    tables_window.configure(bg="#1c1c1c")
+    
+    tk.Label(tables_window, text="Issued Books Table Records", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=15)
+
+    columns = ("book_id", "student_name", "date_of_issue", "book_name")
+    tree = ttk.Treeview(tables_window, columns=columns, show="headings", height=15)
+    
+    tree.heading("book_id", text="Book ID")
+    tree.heading("student_name", text="Student Name")
+    tree.heading("date_of_issue", text="Date of Issue")
+    tree.heading("book_name", text="Book Name")
+    
+    tree.column("book_id", width=100, anchor="center")
+    tree.column("student_name", width=200, anchor="w")
+    tree.column("date_of_issue", width=150, anchor="center")
+    tree.column("book_name", width=250, anchor="w")
+    
+    scrollbar = ttk.Scrollbar(tables_window, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    
+    tree.pack(side="left", fill="both", expand=True, padx=(20, 0), pady=10)
+    scrollbar.pack(side="right", fill="y", padx=(0, 20), pady=10)
 
     try:
-        conn = mysql.connector.connect(
-            host="127.0.0.1",
-            user="root",
-            password="root123456",
-            database="student_db" # Safe to specify now since initialization step created it
-        )
+        conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
         cursor = conn.cursor()
-        
-        # Parameterized insertion for security tracking
-        query = "INSERT INTO students (name, grade) VALUES (%s, %s);"
-        cursor.execute(query, (student_name, student_grade))
-        conn.commit()
-        
-        messagebox.showinfo("Success", f"🎉 Saved {student_name} (Grade: {student_grade}) to the database!")
-        
-        # Clear interface data slots
-        name_entry.delete(0, tk.END)
-        grade_entry.delete(0, tk.END)
-        
+        cursor.execute("SELECT book_id, student_name, date_of_issue, book_name FROM books_issued;")
+        rows = cursor.fetchall()
+        for row in rows:
+            tree.insert("", tk.END, values=row)
     except Error as e:
-        messagebox.showerror("Database Error", f"Failed to push data: {e}")
+        messagebox.showerror("Fetch Error", f"Could not retrieve database rows: {e}")
     finally:
         if 'conn' in locals() and conn.is_connected():
             cursor.close()
             conn.close()
 
-def clear_entry_fields():
-    """Triggered when user clicks 'Clear Fields'"""
-    name_entry.delete(0, tk.END)
-    grade_entry.delete(0, tk.END)
-'''
 
 # ==========================================
-# 3. TKINTER INTERFACE AND LAYOUT
+# ==========================================
+# 3. TKINTER MAIN INTERFACE AND LAYOUT
 # ==========================================
 
 root = tk.Tk()
 root.title("Library Unified Network Database")
 root.geometry("1080x640")
-root.configure(bg="#121212") # Light grey structural theme context
+root.configure(bg="#121212")
 
 # Title Screen Banner
 title_label = tk.Label(root, text="HOME", font=("Segoe UI", 63, "bold"), bg="#121212", fg="#E1E1E1")
 title_label.pack(pady=15)
+
 style = ttk.Style()
-style.theme_use('clam')  # 'clam' theme allows color changes on Mac
+style.theme_use('clam')
 
 style.configure(
     "Custom.TButton",
     font=("Segoe UI", 31, "bold"),
-    background="#FFFCC6",       # Your custom pink hex background
-    foreground="black",         # Text color
+    background="#FFFCC6",
+    foreground="black",
     borderwidth=0,
-             # Darker shade for hover/click feel
-    activeforeground="black"
-    ,cursor="hand2"
+    activeforeground="black",
+    cursor="hand2"
 )
-# --- Name Field Container ---
-#name_label = tk.Label(root, text="Student Name:", font=("Arial", 11), bg="#f0f0f0")
-#name_label.pack(anchor="w", padx=40)
-#name_entry = tk.Entry(root, width=30, font=("Arial", 11))
-#name_entry.pack(pady=5)
 
-# --- Grade Field Container ---
-#grade_label = tk.Label(root, text="Assigned Grade:", font=("Arial", 11), bg="#f0f0f0")
-#grade_label.pack(anchor="w", padx=40, pady=(5, 0))
-#grade_entry = tk.Entry(root, width=30, font=("Arial", 11))
-#grade_entry.pack(pady=5)
-# --- Action Buttons Layout Container ---
-# Save Submission Button
-regst = ttk.Button(root, text="Register", style="Custom.TButton",width=15)
-srch= ttk.Button(root, text="Search", style="Custom.TButton",width=15)
-shtbl = ttk.Button(root, text="Show Tables", style="Custom.TButton",width=15)
-exit = ttk.Button(root, text="Exit", style="Custom.TButton",width=15)
-#func call
-regst.pack(anchor="w", padx=(40, 0), pady=(40, 70))
-srch.pack(anchor="w", padx=(40, 0), pady=(0, 70))
-shtbl.pack(anchor="w", padx=(40, 0), pady=(0, 70))
-exit.pack(anchor="w", padx=(40, 0), pady=(0, 70))
+# --- Primary Action Sidebar Dashboard (Left Side) ---
+regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
+srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
+shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
+exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
-vertical_line = tk.Frame(root, width=6, bg='#007AFF' ) 
-#vertical_line.pack(fill="y", expand=True,side="left", padx=530, pady=0)
-vertical_line.place(
-    relx=0.5,
-    rely=0.2,
-    relheight=0.9,
-    anchor="n")
+regst.pack(anchor="w", padx=(40, 0), pady=(40, 45))
+srch.pack(anchor="w", padx=(40, 0), pady=(0, 45))
+shtbl.pack(anchor="w", padx=(40, 0), pady=(0, 45))
+exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 45))
 
+# Center split line decorator
+vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
+vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
+
+#IMAGE
+try:
+    raw_image = tk.PhotoImage(file="img1.png")
+
+    scale_factor = 5
+    home_image = raw_image.subsample(scale_factor, scale_factor)
+
+
+    image_label = tk.Label(root, image=home_image, bg="#121212")
+
+
+    image_label.place(relx=0.71, rely=0.024, anchor="ne")
+
+except Exception as e:
+    print(f"Error loading img1.png: {e}") 
+
+# library IMAGE
+try:
+    raw_image2 = tk.PhotoImage(file="lib.png")
+
+    scale_factor = 2
+    home_image = raw_image2.subsample(scale_factor, scale_factor)
+
+
+    image_label = tk.Label(root, image=home_image, bg="#121212")
+
+
+    image_label.place(relx=0.5, rely=0.5, anchor="s")
+
+except Exception as e:
+    print(f"Error loading img1.png: {e}") 
 
 # Start application interaction engine tracking loops
+root.mainloop()
+
 root.mainloop()
