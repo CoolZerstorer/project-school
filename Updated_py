@@ -1,7 +1,3 @@
-Here is the complete, updated script. I have integrated the **Pillow** library to handle the image loading and resizing. This forces both images to explicitly constrained dimensions ($80\times80$ for the icon and $400\times300$ for the library graphic) so they fit perfectly inside your interface and don't render off-screen.
-
-Make sure you run `pip install pillow` in your terminal before running this script.
-
 ```python
 import tkinter as tk
 from tkinter import messagebox
