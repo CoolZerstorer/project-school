@@ -4,7 +4,8 @@ from tkinter import messagebox
 from tkinter import ttk
 import mysql.connector
 from mysql.connector import Error
-from PIL import Image, ImageTk  # Handles image formatting and exact resizing safely
+from PIL import Image, ImageTk  
+from datetime import datetime
 
 # ==========================================
 # 1. DATABASE SETUP LOGIC
@@ -20,11 +21,12 @@ def initialize_database():
         cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
         cursor.execute("USE student_db;")
         
+        # Altered date_of_issue column to DATE type for mathematical calculations
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS books_issued (
                 book_id INT PRIMARY KEY,
                 student_name VARCHAR(100) NOT NULL,
-                date_of_issue VARCHAR(50) NOT NULL,
+                date_of_issue DATE NOT NULL,
                 book_name VARCHAR(150) NOT NULL
             );
         """)
@@ -60,29 +62,40 @@ def open_register_window():
     book_id_entry = tk.Entry(form_frame, **ent_opts)
     book_id_entry.grid(row=0, column=1, pady=8, padx=10)
 
-    tk.Label(form_frame, text="Book Name:", **lbl_opts).grid(row=3, column=0, sticky="w", pady=8)
+    tk.Label(form_frame, text="Book Name:", **lbl_opts).grid(row=1, column=0, sticky="w", pady=8)
     book_name_entry = tk.Entry(form_frame, **ent_opts)
-    book_name_entry.grid(row=2, column=1, pady=8, padx=10)
+    book_name_entry.grid(row=1, column=1, pady=8, padx=10)
 
-    tk.Label(form_frame, text="Student Name:", **lbl_opts).grid(row=1, column=0, sticky="w", pady=8)
+    tk.Label(form_frame, text="Student Name:", **lbl_opts).grid(row=2, column=0, sticky="w", pady=8)
     student_name_entry = tk.Entry(form_frame, **ent_opts)
-    student_name_entry.grid(row=1, column=1, pady=8, padx=10)
+    student_name_entry.grid(row=2, column=1, pady=8, padx=10)
 
-    tk.Label(form_frame, text="Date of Issue:", **lbl_opts).grid(row=2, column=0, sticky="w", pady=8)
+    tk.Label(form_frame, text="Date (YYYY-MM-DD):", **lbl_opts).grid(row=3, column=0, sticky="w", pady=8)
     date_entry = tk.Entry(form_frame, **ent_opts)
     date_entry.grid(row=3, column=1, pady=8, padx=10)
+    
+    # Automatically fill with current date to reduce user format mistakes
+    date_entry.insert(0, datetime.today().strftime('%Y-%m-%d'))
 
     def submit_action():
         b_id = book_id_entry.get().strip()
         s_name = student_name_entry.get().strip()
         b_name = book_name_entry.get().strip()
         d_issue = date_entry.get().strip()
+        
         if not b_id or not s_name or not d_issue or not b_name:
             messagebox.showwarning("Missing Information", "Please fill out all fields before submitting!")
             return
         
         if not b_id.isdigit():
             messagebox.showerror("Input Error", "Book ID must be a valid integer number!")
+            return
+            
+        # Validate exact date string input format
+        try:
+            datetime.strptime(d_issue, "%Y-%m-%d")
+        except ValueError:
+            messagebox.showerror("Format Error", "Date must strictly use the YYYY-MM-DD format!")
             return
 
         try:
@@ -106,6 +119,7 @@ def open_register_window():
         student_name_entry.delete(0, tk.END)
         date_entry.delete(0, tk.END)
         book_name_entry.delete(0, tk.END)
+        date_entry.insert(0, datetime.today().strftime('%Y-%m-%d'))
 
     btn_frame = tk.Frame(reg_window, bg="#1c1c1c")
     btn_frame.pack(pady=40)
@@ -211,43 +225,107 @@ def open_search_window():
 def open_tables_window():
     tables_window = tk.Toplevel(root)
     tables_window.title("Database Tables")
-    tables_window.geometry("800x500")
+    tables_window.geometry("900x550") # Expanded slightly for the new data column and action layout button
     tables_window.configure(bg="#1c1c1c")
     
     tk.Label(tables_window, text="Issued Books Table Records", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=15)
 
-    columns = ("book_id", "student_name", "date_of_issue", "book_name")
-    tree = ttk.Treeview(tables_window, columns=columns, show="headings", height=15)
+    # Added Fine tracking column header metadata
+    columns = ("book_id", "student_name", "date_of_issue", "book_name", "fine")
+    tree = ttk.Treeview(tables_window, columns=columns, show="headings", height=12)
     
     tree.heading("book_id", text="Book ID")
     tree.heading("student_name", text="Student Name")
     tree.heading("date_of_issue", text="Date of Issue")
     tree.heading("book_name", text="Book Name")
+    tree.heading("fine", text="Accumulated Fine")
     
-    tree.column("book_id", width=100, anchor="center")
-    tree.column("student_name", width=200, anchor="w")
-    tree.column("date_of_issue", width=150, anchor="center")
-    tree.column("book_name", width=250, anchor="w")
+    tree.column("book_id", width=80, anchor="center")
+    tree.column("student_name", width=180, anchor="w")
+    tree.column("date_of_issue", width=120, anchor="center")
+    tree.column("book_name", width=200, anchor="w")
+    tree.column("fine", width=140, anchor="center")
     
     scrollbar = ttk.Scrollbar(tables_window, orient="vertical", command=tree.yview)
     tree.configure(yscrollcommand=scrollbar.set)
     
-    tree.pack(side="left", fill="both", expand=True, padx=(20, 0), pady=10)
-    scrollbar.pack(side="right", fill="y", padx=(0, 20), pady=10)
+    tree.pack(side="top", fill="both", expand=True, padx=20, pady=10)
+    scrollbar.place(in_=tree, relx=1.0, relheight=1.0, bor=0, anchor="ne")
 
-    try:
-        conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
-        cursor = conn.cursor()
-        cursor.execute("SELECT book_id, student_name, date_of_issue, book_name FROM books_issued;")
-        rows = cursor.fetchall()
-        for row in rows:
-            tree.insert("", tk.END, values=row)
-    except Error as e:
-        messagebox.showerror("Fetch Error", f"Could not retrieve database rows: {e}")
-    finally:
-        if 'conn' in locals() and conn.is_connected():
-            cursor.close()
-            conn.close()
+    # Helper logic function to load records and execute date comparison
+    def load_table_records():
+        # Clear existing items first
+        for item in tree.get_children():
+            tree.delete(item)
+            
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT book_id, student_name, date_of_issue, book_name FROM books_issued;")
+            rows = cursor.fetchall()
+            
+            today = datetime.today().date()
+            
+            for row in rows:
+                b_id, s_name, issue_date, b_name = row
+                
+                # Check delta difference between registration day and execution context date
+                days_passed = (today - issue_date).days
+                
+                # 15 days grace period buffer calculation formula
+                if days_passed > 15:
+                    fine_amt = (days_passed - 15) * 100
+                    fine_str = f"₹{fine_amt} ({days_passed - 15} days overdue)"
+                else:
+                    fine_str = "₹0 (Safe)"
+                    
+                tree.insert("", tk.END, values=(b_id, s_name, issue_date.strftime('%Y-%m-%d'), b_name, fine_str))
+        except Error as e:
+            messagebox.showerror("Fetch Error", f"Could not retrieve database rows: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    # Deletes item entirely from storage configuration table mappings
+    def clear_selected_record():
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Selection Warning", "Please click on a record row from the table list first to clear it!")
+            return
+            
+        record_values = tree.item(selected_item)['values']
+        target_book_id = record_values[0]
+        student_target = record_values[1]
+        
+        confirm = messagebox.askyesno("Confirm Return", f"Are you sure you want to mark Book ID {target_book_id} as returned by {student_target}?\nThis removes the record and drops further active fines.")
+        if not confirm:
+            return
+
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM books_issued WHERE book_id = %s;", (int(target_book_id),))
+            conn.commit()
+            
+            messagebox.showinfo("Returned Successfully", "Record wiped clean. Book is available in inventory once again.")
+            load_table_records() # Refresh live data tree
+        except Error as e:
+            messagebox.showerror("Database Execution Error", f"Could not modify entry schema indices: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    # Interactive control dashboard button layout placement
+    btn_control_frame = tk.Frame(tables_window, bg="#1c1c1c")
+    btn_control_frame.pack(pady=15)
+    
+    return_btn = tk.Button(btn_control_frame, text="Mark Selected as Returned / Clear Record", font=("Segoe UI", 12, "bold"), bg="#4CAF50", fg="black", relief="flat", padx=15, pady=5, command=clear_selected_record)
+    return_btn.pack()
+
+    # Populate initial load calculation loop immediately
+    load_table_records()
 
 
 # ==========================================
@@ -293,14 +371,11 @@ vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
 # --- IMAGE 1 (Top Corner Decorator Icon) ---
 try:
     pil_img1 = Image.open("img1.png")
-    # Forces asset down into an explicit icon box size
     pil_img1 = pil_img1.resize((80, 80), Image.Resampling.LANCZOS) 
     home_image = ImageTk.PhotoImage(pil_img1)
 
     image_label = tk.Label(root, image=home_image, bg="#121212")
     image_label.place(relx=0.98, rely=0.024, anchor="ne")
-    
-    # Internal component registration lock
     image_label.image = home_image
 
 except Exception as e:
@@ -309,16 +384,11 @@ except Exception as e:
 # --- IMAGE 2 (Library Main Screen Graphic) ---
 try:
     pil_lib = Image.open("lib.png")
-    
-    # FORCED GEOMETRY: Confines your graphic dimension box to work with window limits
     pil_lib = pil_lib.resize((400, 300), Image.Resampling.LANCZOS)
     lib_image = ImageTk.PhotoImage(pil_lib)
 
     lib_image_label = tk.Label(root, image=lib_image, bg="#121212")
-    # Perfectly centers it in the empty right panel space
     lib_image_label.place(relx=0.75, rely=0.55, anchor="center")
-
-    # Internal component registration lock
     lib_image_label.image = lib_image
 
 except Exception as e:
