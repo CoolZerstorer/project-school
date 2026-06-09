@@ -45,7 +45,7 @@ initialize_database()
 def open_register_window():
     reg_window = tk.Toplevel(root)
     reg_window.title("Register Student Book Issue")
-    reg_window.geometry("600x550")
+    reg_window.geometry("500x400")
     reg_window.configure(bg="#1c1c1c")
     
     tk.Label(reg_window, text="Book Registration Form", font=("Segoe UI", 24, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=25)
@@ -366,11 +366,11 @@ vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
 # --- IMAGE 1 ---
 try:
     pil_img1 = Image.open("img1.png")
-    pil_img1 = pil_img1.resize((80, 80), Image.Resampling.LANCZOS) 
+    pil_img1 = pil_img1.resize((120, 90), Image.Resampling.LANCZOS) 
     home_image = ImageTk.PhotoImage(pil_img1)
 
     image_label = tk.Label(root, image=home_image, bg="#121212")
-    image_label.place(relx=0.98, rely=0.024, anchor="ne")
+    image_label.place(relx=0.71, rely=0.024, anchor="ne")
     image_label.image = home_image
 except Exception as e:
     print(f"Error loading img1.png: {e}") 
