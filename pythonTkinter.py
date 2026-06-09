@@ -534,7 +534,7 @@ def open_archive_history_view():
 
 
 # ==========================================
-# 3. SECURE AUTHENTICATION SYSTEM (NEW MODULE)
+# 3. SECURE AUTHENTICATION SYSTEM
 # ==========================================
 def open_login_screen():
     login_win = tk.Toplevel(root)
@@ -542,7 +542,6 @@ def open_login_screen():
     login_win.geometry("400x320")
     login_win.configure(bg="#121212")
     
-    # Handle user clicking the window close button 'X' directly
     def on_login_close():
         root.destroy()
     login_win.protocol("WM_DELETE_WINDOW", on_login_close)
@@ -552,13 +551,11 @@ def open_login_screen():
     lbl_opts = {"font": ("Segoe UI", 11), "bg": "#121212", "fg": "#E1E1E1"}
     ent_opts = {"font": ("Segoe UI", 11), "bg": "#2d2d2d", "fg": "white", "insertbackground": "white", "relief": "flat"}
 
-    # Username Widgets
     tk.Label(login_win, text="Administrator Identity ID:", **lbl_opts).pack(pady=(10, 2))
     username_entry = tk.Entry(login_win, width=28, **ent_opts)
     username_entry.pack(pady=2)
     username_entry.focus()
 
-    # Password Widgets
     tk.Label(login_win, text="System Verification Token:", **lbl_opts).pack(pady=(10, 2))
     
     password_frame = tk.Frame(login_win, bg="#121212")
@@ -575,7 +572,7 @@ def open_login_screen():
             password_entry.config(show="*")
             toggle_btn.config(text="Show", bg="#333333")
 
-    toggle_btn = tk.Button(password_frame, text="Show", font=("Segoe UI", 9, "bold"), command=toggle_password, width=6, bg="#333333", fg="white", relief="flat")
+    toggle_btn = tk.Button(password_frame, text="Show", font=("Segoe UI", 9, "bold"), command=toggle_password, width=6, bg="black", fg="black", relief="flat")
     toggle_btn.pack(side=tk.LEFT, padx=(6, 0))
 
     def check_login():
@@ -585,14 +582,13 @@ def open_login_screen():
         if username == "admin" and password == "secret123":
             messagebox.showinfo("Success", "Authorisation Token verified successfully!")
             login_win.destroy()
-            root.deiconify() # Reveal core architecture dashboard window 
+            root.deiconify() 
         else:
             messagebox.showerror("Access Denied", "Invalid administrative identity mapping arrays.")
 
-    # Bind Enter Key directly to trigger authentication process rapidly
     login_win.bind('<Return>', lambda event: check_login())
 
-    login_button = tk.Button(login_win, text="Authenticate System", font=("Segoe UI", 12, "bold"), command=check_login, bg="#007AFF", fg="white", relief="flat", width=20)
+    login_button = tk.Button(login_win, text="Authenticate System", font=("Segoe UI", 12, "bold"), command=check_login, bg="black", fg="black", relief="flat", width=20)
     login_button.pack(pady=30)
 
 
@@ -605,7 +601,7 @@ root.title("Library Unified Network Database")
 root.geometry("1080x640")
 root.configure(bg="#121212")
 
-# Completely hide core window matrix arrays initially until login validation clears
+# Hide main loop layout safely immediately until login clears
 root.withdraw()
 
 title_label = tk.Label(root, text="HOME", font=("Segoe UI", 63, "bold"), bg="#121212", fg="#E1E1E1")
@@ -614,14 +610,21 @@ title_label.pack(pady=15)
 style = ttk.Style()
 style.theme_use('clam')
 
+# Configures the default layout state
 style.configure(
     "Custom.TButton",
     font=("Segoe UI", 31, "bold"), 
     background="#FFFCC6",
     foreground="black",
     borderwidth=0,
-    activeforeground="black",
     cursor="hand2"
+)
+
+# Enforces permanent black font configuration state during hovering/clicking actions
+style.map(
+    "Custom.TButton",
+    foreground=[('pressed', 'black'), ('active', 'black')],
+    background=[('pressed', '#E6E3B3'), ('active', '#FFFCC6')]
 )
 
 # --- Sidebar Configuration Layout ---
@@ -637,17 +640,18 @@ archive_btn = tk.Button(
 )
 archive_btn.place(relx=0.96, rely=0.94, anchor="se")
 
+# Reconfigured as highly-styled ttk Elements safely packed without layout crashing tags
 regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
 updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
 shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
 exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
-regst.pack(anchor="w", padx=(100, 0), pady=(40, 45))
-srch.pack(anchor="w", padx=(100, 0), pady=(0, 45))
-updt.pack(anchor="w", padx=(100, 0), pady=(0, 45))
-shtbl.pack(anchor="w", padx=(100, 0), pady=(0, 45))
-exit_btn.pack(anchor="w", padx=(100, 0), pady=(0, 45))
+regst.pack(side="top", anchor="w", padx=(100, 0), pady=(40, 45))
+srch.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+updt.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+shtbl.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+exit_btn.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
 
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
 vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
@@ -676,7 +680,7 @@ try:
 except Exception as e:
     print(f"Error loading lib.png: {e}") 
 
-# Launch secure authorization sub-layer window loop sequence directly
+# Launch secure authorization gatekeeper module
 open_login_screen()
 
 root.mainloop()
