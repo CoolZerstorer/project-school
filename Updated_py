@@ -563,7 +563,7 @@ style.theme_use('clam')
 
 style.configure(
     "Custom.TButton",
-    font=("Segoe UI", 26, "bold"), 
+    font=("Segoe UI", 31, "bold"), 
     background="#FFFCC6",
     foreground="black",
     borderwidth=0,
@@ -590,11 +590,11 @@ updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command
 shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
 exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
-regst.pack(anchor="w", padx=(40, 0), pady=(25, 25))
-srch.pack(anchor="w", padx=(40, 0), pady=(0, 25))
-updt.pack(anchor="w", padx=(40, 0), pady=(0, 25))
-shtbl.pack(anchor="w", padx=(40, 0), pady=(0, 25))
-exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 25))
+regst.pack(anchor="w", padx=(100, 0), pady=(40, 45))
+srch.pack(anchor="w", padx=(100, 0), pady=(0, 45))
+updt.pack(anchor="w", padx=(100, 0), pady=(0, 45))
+shtbl.pack(anchor="w", padx=(100, 0), pady=(0, 45))
+exit_btn.pack(anchor="w", padx=(100, 0), pady=(0, 45))
 
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
 vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
