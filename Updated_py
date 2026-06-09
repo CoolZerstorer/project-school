@@ -404,4 +404,211 @@ def open_update_window():
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
-            cursor.execute("SELECT book_name, student_id,
+            cursor.execute("SELECT book_name, student_id, student_name, date_of_issue FROM books_issued WHERE book_id = %s;", (int(b_id),))
+            record = cursor.fetchone()
+            
+            if not record:
+                messagebox.showerror("Not Found", f"No active issue records discovered matching Book ID: {b_id}")
+                return
+                
+            up_book_name.delete(0, tk.END)
+            up_student_id.delete(0, tk.END)
+            up_student_name.delete(0, tk.END)
+            up_date_issue.delete(0, tk.END)
+            
+            up_book_name.insert(0, record[0])
+            up_student_id.insert(0, record[1])
+            up_student_name.insert(0, record[2])
+            
+            date_val = record[3].strftime('%Y-%m-%d') if isinstance(record[3], datetime) or hasattr(record[3], 'strftime') else str(record[3])
+            up_date_issue.insert(0, date_val)
+            
+            messagebox.showinfo("Loaded", "Record fetched successfully! You can now make changes.")
+            
+        except Error as e:
+            messagebox.showerror("Error", f"Could not read row: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    def commit_updates():
+        b_id = search_id_entry.get().strip()
+        b_name = up_book_name.get().strip()
+        s_id = up_student_id.get().strip()
+        s_name = up_student_name.get().strip()
+        d_issue = up_date_issue.get().strip()
+        
+        if not b_id or not b_name or not s_id or not s_name or not d_issue:
+            messagebox.showwarning("Validation Error", "All fields must be completely filled out before saving updates!")
+            return
+            
+        try:
+            datetime.strptime(d_issue, "%Y-%m-%d")
+        except ValueError:
+            messagebox.showerror("Format Error", "Date must strictly use the YYYY-MM-DD format structure!")
+            return
+            
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            query = """
+                UPDATE books_issued 
+                SET book_name = %s, student_id = %s, student_name = %s, date_of_issue = %s 
+                WHERE book_id = %s;
+            """
+            cursor.execute(query, (b_name, s_id, s_name, d_issue, int(b_id)))
+            conn.commit()
+            
+            messagebox.showinfo("Success", "Library schema modifications saved successfully!")
+            update_window.destroy() 
+        except Error as e:
+            messagebox.showerror("Database Execution Error", f"Could not update fields: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    fetch_btn = tk.Button(fetch_frame, text="Find/Load", font=("Segoe UI", 10, "bold"), bg="#FFFCC6", fg="black", command=fetch_target_record, relief="flat", width=10)
+    fetch_btn.grid(row=0, column=2, padx=15, pady=15)
+    
+    save_btn = tk.Button(update_window, text="Save Updates", font=("Segoe UI", 13, "bold"), bg="#4CAF50", fg="black", relief="flat", width=18, command=commit_updates)
+    save_btn.pack(pady=10)
+
+
+# ==========================================
+# NEW MAIN WINDOW ACCESSORY: ARCHIVE OVERVIEW
+# ==========================================
+def open_archive_history_view():
+    arch_win = tk.Toplevel(root)
+    arch_win.title("Permanent History Returns Log Archive")
+    arch_win.geometry("950x500")
+    arch_win.configure(bg="#111111")
+    
+    tk.Label(arch_win, text="📚 Permanent Historical Book Logs Archive", font=("Segoe UI", 18, "bold"), bg="#111111", fg="#007AFF").pack(pady=15)
+    
+    columns = ("arc_id", "b_id", "s_id", "s_name", "iss_date", "b_name", "ret_date")
+    a_tree = ttk.Treeview(arch_win, columns=columns, show="headings", height=14)
+    
+    a_tree.heading("arc_id", text="Log ID")
+    a_tree.heading("b_id", text="Book ID")
+    a_tree.heading("s_id", text="Student ID")
+    a_tree.heading("s_name", text="Student Name")
+    a_tree.heading("iss_date", text="Issue Date")
+    a_tree.heading("b_name", text="Book Name")
+    a_tree.heading("ret_date", text="Returned Timestamp")
+    
+    a_tree.column("arc_id", width=60, anchor="center")
+    a_tree.column("b_id", width=70, anchor="center")
+    a_tree.column("s_id", width=90, anchor="center")
+    a_tree.column("s_name", width=140, anchor="w")
+    a_tree.column("iss_date", width=110, anchor="center")
+    a_tree.column("b_name", width=160, anchor="w")
+    a_tree.column("ret_date", width=180, anchor="center")
+    
+    scroll = ttk.Scrollbar(arch_win, orient="vertical", command=a_tree.yview)
+    a_tree.configure(yscrollcommand=scroll.set)
+    
+    a_tree.pack(side="left", fill="both", expand=True, padx=(20,0), pady=15)
+    scroll.pack(side="right", fill="y", padx=(0,20), pady=15)
+    
+    try:
+        conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT archive_id, book_id, student_id, student_name, date_of_issue, book_name, date_of_return FROM archived_books ORDER BY date_of_return DESC;")
+        records = cursor.fetchall()
+        
+        for item in records:
+            iss_str = item[4].strftime('%Y-%m-%d') if hasattr(item[4], 'strftime') else str(item[4])
+            ret_str = item[6].strftime('%Y-%m-%d %H:%M:%S') if hasattr(item[6], 'strftime') else str(item[6])
+            a_tree.insert("", tk.END, values=(item[0], item[1], item[2], item[3], iss_str, item[5], ret_str))
+    except Error as e:
+        messagebox.showerror("Error Loading Archive", f"Could not sync with structural storage history rows: {e}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
+
+
+# ==========================================
+# 3. TKINTER MAIN INTERFACE AND LAYOUT
+# ==========================================
+
+root = tk.Tk()
+root.title("Library Unified Network Database")
+root.geometry("1080x640")
+root.configure(bg="#121212")
+
+title_label = tk.Label(root, text="HOME", font=("Segoe UI", 63, "bold"), bg="#121212", fg="#E1E1E1")
+title_label.pack(pady=15)
+
+style = ttk.Style()
+style.theme_use('clam')
+
+style.configure(
+    "Custom.TButton",
+    font=("Segoe UI", 26, "bold"), 
+    background="#FFFCC6",
+    foreground="black",
+    borderwidth=0,
+    activeforeground="black",
+    cursor="hand2"
+)
+
+# --- Sidebar Configuration Layout ---
+regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
+srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
+updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
+shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
+exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
+
+regst.pack(anchor="w", padx=(40, 0), pady=(25, 25))
+srch.pack(anchor="w", padx=(40, 0), pady=(0, 25))
+updt.pack(anchor="w", padx=(40, 0), pady=(0, 25))
+shtbl.pack(anchor="w", padx=(40, 0), pady=(0, 25))
+exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 25))
+
+vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
+vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
+
+# --- IMAGE 1 ---
+try:
+    pil_img1 = Image.open("img1.png")
+    pil_img1 = pil_img1.resize((120, 90), Image.Resampling.LANCZOS) 
+    home_image = ImageTk.PhotoImage(pil_img1)
+
+    image_label = tk.Label(root, image=home_image, bg="#121212")
+    image_label.place(relx=0.71, rely=0.024, anchor="ne")
+    image_label.image = home_image
+except Exception as e:
+    print(f"Error loading img1.png: {e}") 
+
+# --- IMAGE 2 ---
+try:
+    pil_lib = Image.open("lib.png")
+    pil_lib = pil_lib.resize((400, 300), Image.Resampling.LANCZOS)
+    lib_image = ImageTk.PhotoImage(pil_lib)
+
+    lib_image_label = tk.Label(root, image=lib_image, bg="#121212")
+    lib_image_label.place(relx=0.75, rely=0.55, anchor="center")
+    lib_image_label.image = lib_image
+except Exception as e:
+    print(f"Error loading lib.png: {e}") 
+
+# --- MAIN HOME SCREEN ARCHIVE BUTTON (BOTTOM RIGHT, BLUE) ---
+archive_btn = tk.Button(
+    root, 
+    text="Archive History", 
+    font=("Segoe UI", 14, "bold"), 
+    bg="#007AFF", 
+    fg="white", 
+    activebackground="#0051B3",
+    activeforeground="white",
+    relief="flat", 
+    padx=20, 
+    pady=10,
+    command=open_archive_history_view
+)
+archive_btn.place(relx=0.96, rely=0.94, anchor="se")
+
+root.mainloop()
