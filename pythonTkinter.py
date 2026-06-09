@@ -45,7 +45,7 @@ initialize_database()
 def open_register_window():
     reg_window = tk.Toplevel(root)
     reg_window.title("Register Student Book Issue")
-    reg_window.geometry("500x400")
+    reg_window.geometry("600x500")
     reg_window.configure(bg="#1c1c1c")
     
     tk.Label(reg_window, text="Book Registration Form", font=("Segoe UI", 24, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=25)
@@ -64,13 +64,19 @@ def open_register_window():
     book_name_entry = tk.Entry(form_frame, **ent_opts)
     book_name_entry.grid(row=1, column=1, pady=8, padx=10)
 
-    tk.Label(form_frame, text="Student Name:", **lbl_opts).grid(row=2, column=0, sticky="w", pady=8)
-    student_name_entry = tk.Entry(form_frame, **ent_opts)
-    student_name_entry.grid(row=2, column=1, pady=8, padx=10)
+    tk.Label(form_frame, text="Student ID:", **lbl_opts).grid(row=2, column=0, sticky="w", pady=8)
+    student_id_entry = tk.Entry(form_frame, **ent_opts)
+    student_id_entry.grid(row=2, column=1, pady=8, padx=10)
 
-    tk.Label(form_frame, text="Date (YYYY-MM-DD):", **lbl_opts).grid(row=3, column=0, sticky="w", pady=8)
+    tk.Label(form_frame, text="Student Name:", **lbl_opts).grid(row=3, column=0, sticky="w", pady=8)
+    student_name_entry = tk.Entry(form_frame, **ent_opts)
+    student_name_entry.grid(row=3, column=1, pady=8, padx=10)
+
+    tk.Label(form_frame, text="Date (YYYY-MM-DD):", **lbl_opts).grid(row=4, column=0, sticky="w", pady=8)
     date_entry = tk.Entry(form_frame, **ent_opts)
-    date_entry.grid(row=3, column=1, pady=8, padx=10)
+    date_entry.grid(row=4, column=1, pady=8, padx=10)
+
+    
     
     date_entry.insert(0, datetime.today().strftime('%Y-%m-%d'))
 
@@ -233,12 +239,14 @@ def open_tables_window():
     tree.heading("student_name", text="Student Name")
     tree.heading("date_of_issue", text="Date of Issue")
     tree.heading("book_name", text="Book Name")
+    tree.heading("ID", text="Student ID")
     tree.heading("fine", text="Accumulated Fine")
     
     tree.column("book_id", width=100, anchor="center")
     tree.column("student_name", width=180, anchor="w")
     tree.column("date_of_issue", width=140, anchor="center")
     tree.column("book_name", width=220, anchor="w")
+    tree.column("ID", width=120, anchor="center")
     tree.column("fine", width=180, anchor="center")
     
     scrollbar = ttk.Scrollbar(tables_window, orient="vertical", command=tree.yview)
