@@ -239,12 +239,14 @@ def open_tables_window():
     tree.heading("student_name", text="Student Name")
     tree.heading("date_of_issue", text="Date of Issue")
     tree.heading("book_name", text="Book Name")
+    tree.heading("ID", text="Student ID")
     tree.heading("fine", text="Accumulated Fine")
     
     tree.column("book_id", width=100, anchor="center")
     tree.column("student_name", width=180, anchor="w")
     tree.column("date_of_issue", width=140, anchor="center")
     tree.column("book_name", width=220, anchor="w")
+    tree.column("ID", width=120, anchor="center")
     tree.column("fine", width=180, anchor="center")
     
     scrollbar = ttk.Scrollbar(tables_window, orient="vertical", command=tree.yview)
