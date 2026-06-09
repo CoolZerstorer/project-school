@@ -20,7 +20,7 @@ def initialize_database():
         cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
         cursor.execute("USE student_db;")
         
-        # Active Records Table (Added fine column for manual modifications)
+        # Active Records Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS books_issued (
                 book_id INT PRIMARY KEY,
@@ -45,7 +45,6 @@ def initialize_database():
             );
         """)
         
-        # Safeguard: Check if 'fine' column exists in case the table was created previously without it
         try:
             cursor.execute("ALTER TABLE books_issued ADD COLUMN fine INT DEFAULT 0;")
         except Error:
@@ -285,7 +284,6 @@ def open_tables_window():
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
-            # Pulled the saved manual fine from database
             cursor.execute("SELECT book_id, student_id, student_name, date_of_issue, book_name, fine FROM books_issued;")
             rows = cursor.fetchall()
             
@@ -297,7 +295,6 @@ def open_tables_window():
                 else:
                     issue_date_obj = issue_date
 
-                # Display manually set fine value if it exists, otherwise standard layout
                 fine_str = f"₹{stored_fine}"
                 
                 tree.insert("", tk.END, values=(b_id, s_id, s_name, issue_date_obj.strftime('%Y-%m-%d'), b_name, fine_str))
@@ -329,14 +326,12 @@ def open_tables_window():
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
             
-            # Transfer active record info over to archive permanently
             archive_query = """
                 INSERT INTO archived_books (book_id, student_id, student_name, date_of_issue, book_name)
                 VALUES (%s, %s, %s, %s, %s);
             """
             cursor.execute(archive_query, (int(target_book_id), student_id_target, student_target, date_issued_target, book_name_target))
             
-            # Wipe from active tracking table
             cursor.execute("DELETE FROM books_issued WHERE book_id = %s;", (int(target_book_id),))
             conn.commit()
             
@@ -361,12 +356,11 @@ def open_tables_window():
 def open_update_window():
     update_window = tk.Toplevel(root)
     update_window.title("Update Library Records")
-    update_window.geometry("600x620") # Expanded slightly to fit fine element cleanly
+    update_window.geometry("600x620") 
     update_window.configure(bg="#1c1c1c")
     
     tk.Label(update_window, text="Modify Record Fields", font=("Segoe UI", 24, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
     
-    # Target Selection Frame (Fetch data by Book ID)
     fetch_frame = tk.LabelFrame(update_window, text=" Find Record by Book ID ", font=("Segoe UI", 11, "bold"), bg="#1c1c1c", fg="#FFFCC6", bd=2, relief="groove")
     fetch_frame.pack(padx=40, fill="x", pady=10)
     
@@ -374,7 +368,6 @@ def open_update_window():
     search_id_entry = tk.Entry(fetch_frame, font=("Segoe UI", 12), width=15, bg="#2d2d2d", fg="white", insertbackground="white", relief="flat")
     search_id_entry.grid(row=0, column=1, padx=10, pady=15)
     
-    # Fields Frame
     fields_frame = tk.Frame(update_window, bg="#1c1c1c")
     fields_frame.pack(padx=50, fill="x", pady=15)
     
@@ -397,7 +390,6 @@ def open_update_window():
     up_date_issue = tk.Entry(fields_frame, **ent_opts)
     up_date_issue.grid(row=3, column=1, pady=8, padx=10)
 
-    # NEW: Manual Fine Overwrite Input Field Layout
     tk.Label(fields_frame, text="Accumulated Fine (₹):", **lbl_opts).grid(row=4, column=0, sticky="w", pady=8)
     up_fine = tk.Entry(fields_frame, **ent_opts)
     up_fine.grid(row=4, column=1, pady=8, padx=10)
@@ -411,7 +403,6 @@ def open_update_window():
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
-            # Added fine to the data query selection parameters
             cursor.execute("SELECT book_name, student_id, student_name, date_of_issue, fine FROM books_issued WHERE book_id = %s;", (int(b_id),))
             record = cursor.fetchone()
             
@@ -423,7 +414,7 @@ def open_update_window():
             up_student_id.delete(0, tk.END)
             up_student_name.delete(0, tk.END)
             up_date_issue.delete(0, tk.END)
-            up_fine.delete(0, tk.END) # Clear fine field
+            up_fine.delete(0, tk.END)
             
             up_book_name.insert(0, record[0])
             up_student_id.insert(0, record[1])
@@ -431,7 +422,7 @@ def open_update_window():
             
             date_val = record[3].strftime('%Y-%m-%d') if isinstance(record[3], datetime) or hasattr(record[3], 'strftime') else str(record[3])
             up_date_issue.insert(0, date_val)
-            up_fine.insert(0, str(record[4])) # Insert fetched database fine value
+            up_fine.insert(0, str(record[4]))
             
             messagebox.showinfo("Loaded", "Record fetched successfully! You can now make changes.")
             
@@ -467,7 +458,6 @@ def open_update_window():
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
-            # Updated to update fine field values mapping parameters
             query = """
                 UPDATE books_issued 
                 SET book_name = %s, student_id = %s, student_name = %s, date_of_issue = %s, fine = %s 
@@ -492,9 +482,6 @@ def open_update_window():
     save_btn.pack(pady=10)
 
 
-# ==========================================
-# NEW MAIN WINDOW ACCESSORY: ARCHIVE OVERVIEW
-# ==========================================
 def open_archive_history_view():
     arch_win = tk.Toplevel(root)
     arch_win.title("Permanent History Returns Log Archive")
@@ -547,7 +534,66 @@ def open_archive_history_view():
 
 
 # ==========================================
-# 3. TKINTER MAIN INTERFACE AND LAYOUT
+# 3. SECURE AUTHENTICATION SYSTEM
+# ==========================================
+def open_login_screen():
+    login_win = tk.Toplevel(root)
+    login_win.title("Secure Gatekeeper System")
+    login_win.geometry("400x320")
+    login_win.configure(bg="#121212")
+    
+    def on_login_close():
+        root.destroy()
+    login_win.protocol("WM_DELETE_WINDOW", on_login_close)
+
+    tk.Label(login_win, text="SECURITY ACCESS", font=("Segoe UI", 18, "bold"), bg="#121212", fg="#FFFCC6").pack(pady=(25, 15))
+
+    lbl_opts = {"font": ("Segoe UI", 11), "bg": "#121212", "fg": "#E1E1E1"}
+    ent_opts = {"font": ("Segoe UI", 11), "bg": "#2d2d2d", "fg": "white", "insertbackground": "white", "relief": "flat"}
+
+    tk.Label(login_win, text="Administrator Identity ID:", **lbl_opts).pack(pady=(10, 2))
+    username_entry = tk.Entry(login_win, width=28, **ent_opts)
+    username_entry.pack(pady=2)
+    username_entry.focus()
+
+    tk.Label(login_win, text="System Verification Token:", **lbl_opts).pack(pady=(10, 2))
+    
+    password_frame = tk.Frame(login_win, bg="#121212")
+    password_frame.pack(pady=2)
+
+    password_entry = tk.Entry(password_frame, show="*", width=20, **ent_opts)
+    password_entry.pack(side=tk.LEFT)
+
+    def toggle_password():
+        if password_entry.cget("show") == "*":
+            password_entry.config(show="")
+            toggle_btn.config(text="Hide", bg="#494949")
+        else:
+            password_entry.config(show="*")
+            toggle_btn.config(text="Show", bg="#333333")
+
+    toggle_btn = tk.Button(password_frame, text="Show", font=("Segoe UI", 9, "bold"), command=toggle_password, width=6, bg="#333333", fg="white", relief="flat")
+    toggle_btn.pack(side=tk.LEFT, padx=(6, 0))
+
+    def check_login():
+        username = username_entry.get().strip()
+        password = password_entry.get()
+        
+        if username == "admin" and password == "secret123":
+            messagebox.showinfo("Success", "Authorisation Token verified successfully!")
+            login_win.destroy()
+            root.deiconify() 
+        else:
+            messagebox.showerror("Access Denied", "Invalid administrative identity mapping arrays.")
+
+    login_win.bind('<Return>', lambda event: check_login())
+
+    login_button = tk.Button(login_win, text="Authenticate System", font=("Segoe UI", 12, "bold"), command=check_login, bg="#007AFF", fg="white", relief="flat", width=20)
+    login_button.pack(pady=30)
+
+
+# ==========================================
+# 4. TKINTER MAIN INTERFACE AND LAYOUT
 # ==========================================
 
 root = tk.Tk()
@@ -555,20 +601,30 @@ root.title("Library Unified Network Database")
 root.geometry("1080x640")
 root.configure(bg="#121212")
 
+# Hide main loop layout safely immediately until login clears
+root.withdraw()
+
 title_label = tk.Label(root, text="HOME", font=("Segoe UI", 63, "bold"), bg="#121212", fg="#E1E1E1")
 title_label.pack(pady=15)
 
 style = ttk.Style()
 style.theme_use('clam')
 
+# Configures the default layout state
 style.configure(
     "Custom.TButton",
     font=("Segoe UI", 31, "bold"), 
     background="#FFFCC6",
     foreground="black",
     borderwidth=0,
-    activeforeground="black",
     cursor="hand2"
+)
+
+# Enforces permanent black font configuration state during hovering/clicking actions
+style.map(
+    "Custom.TButton",
+    foreground=[('pressed', 'black'), ('active', 'black')],
+    background=[('pressed', '#E6E3B3'), ('active', '#FFFCC6')]
 )
 
 # --- Sidebar Configuration Layout ---
@@ -584,17 +640,18 @@ archive_btn = tk.Button(
 )
 archive_btn.place(relx=0.96, rely=0.94, anchor="se")
 
+# Reconfigured as highly-styled ttk Elements safely packed without layout crashing tags
 regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
 updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
 shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
 exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
-regst.pack(anchor="w", padx=(100, 0), pady=(40, 45))
-srch.pack(anchor="w", padx=(100, 0), pady=(0, 45))
-updt.pack(anchor="w", padx=(100, 0), pady=(0, 45))
-shtbl.pack(anchor="w", padx=(100, 0), pady=(0, 45))
-exit_btn.pack(anchor="w", padx=(100, 0), pady=(0, 45))
+regst.pack(side="top", anchor="w", padx=(100, 0), pady=(40, 45))
+srch.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+updt.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+shtbl.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+exit_btn.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
 
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
 vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
@@ -622,5 +679,8 @@ try:
     lib_image_label.image = lib_image
 except Exception as e:
     print(f"Error loading lib.png: {e}") 
+
+# Launch secure authorization gatekeeper module
+open_login_screen()
 
 root.mainloop()
