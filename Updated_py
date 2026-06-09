@@ -555,7 +555,19 @@ style.configure(
     cursor="hand2"
 )
 
+
 # --- Sidebar Configuration Layout ---
+archive_btn = tk.Button(
+    root, 
+    text="Archive", 
+    font=("Segoe UI", 14, "bold"), 
+    background="#59F604",
+    relief="flat", 
+    padx=20, 
+    pady=10,
+    command=open_archive_history_view
+)
+archive_btn.place(relx=0.96, rely=0.94, anchor="se")
 regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
 updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
@@ -596,19 +608,6 @@ except Exception as e:
     print(f"Error loading lib.png: {e}") 
 
 # --- MAIN HOME SCREEN ARCHIVE BUTTON (BOTTOM RIGHT, BLUE) ---
-archive_btn = tk.Button(
-    root, 
-    text="Archive History", 
-    font=("Segoe UI", 14, "bold"), 
-    bg="#007AFF", 
-    fg="white", 
-    activebackground="#0051B3",
-    activeforeground="white",
-    relief="flat", 
-    padx=20, 
-    pady=10,
-    command=open_archive_history_view
-)
-archive_btn.place(relx=0.96, rely=0.94, anchor="se")
+
 
 root.mainloop()
