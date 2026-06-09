@@ -19,26 +19,7 @@ def initialize_database():
         cursor = conn.cursor()
         cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
         cursor.execute("USE student_db;")
-
-
         
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS books_issued (
-                book_id INT PRIMARY KEY,
-                student_id VARCHAR(50) NOT NULL,
-                student_name VARCHAR(100) NOT NULL,
-                date_of_issue DATE NOT NULL,
-                book_name VARCHAR(150) NOT NULL
-            );
-        """)
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Error as e:
-        print(f"Database initialization error: {e}")
-
-        
-        # Added student_id field to the schema setup
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS books_issued (
                 book_id INT PRIMARY KEY,
@@ -122,7 +103,6 @@ def open_register_window():
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
-            # Updated entry registration query parameters to accommodate student_id
             query = "INSERT INTO books_issued (book_id, student_id, student_name, date_of_issue, book_name) VALUES (%s, %s, %s, %s, %s);"
             cursor.execute(query, (int(b_id), s_id, s_name, d_issue, b_name))
             conn.commit()
@@ -253,7 +233,6 @@ def open_tables_window():
     
     tk.Label(tables_window, text="Issued Books Table Records", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=15)
 
-    # Added "student_id" into the Treeview columns configuration structural properties
     columns = ("book_id", "student_id", "student_name", "date_of_issue", "book_name", "fine")
     tree = ttk.Treeview(tables_window, columns=columns, show="headings", height=12)
     
@@ -284,7 +263,6 @@ def open_tables_window():
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
-            # Pulled student_id out alongside structural row details
             cursor.execute("SELECT book_id, student_id, student_name, date_of_issue, book_name FROM books_issued;")
             rows = cursor.fetchall()
             
@@ -306,7 +284,6 @@ def open_tables_window():
                 else:
                     fine_str = "₹0 (Safe)"
                 
-                # Dynamic tuple match setup containing exactly 6 elements to match the visual tree configuration layout properties
                 tree.insert("", tk.END, values=(b_id, s_id, s_name, issue_date_obj.strftime('%Y-%m-%d'), b_name, fine_str))
         except Error as e:
             messagebox.showerror("Fetch Error", f"Could not retrieve database rows: {e}")
@@ -323,7 +300,7 @@ def open_tables_window():
             
         record_values = tree.item(selected_item)['values']
         target_book_id = record_values[0]
-        student_target = record_values[2] # Offset tracking index changed from 1 to 2 because student_id is now position 1
+        student_target = record_values[2] 
         
         confirm = messagebox.askyesno("Confirm Return", f"Are you sure you want to mark Book ID {target_book_id} as returned by {student_target}?\nThis removes the record and drops further active fines.")
         if not confirm:
@@ -336,7 +313,7 @@ def open_tables_window():
             conn.commit()
             
             messagebox.showinfo("Returned Successfully", "Record wiped clean. Book is available in inventory once again.")
-            load_table_records() 
+            load_table_records()  
         except Error as e:
             messagebox.showerror("Database Execution Error", f"Could not modify entry schema indices: {e}")
         finally:
@@ -351,6 +328,132 @@ def open_tables_window():
     return_btn.pack()
 
     load_table_records()
+
+
+# ==========================================
+# NEW FEATURE: UPDATE RECORDS WINDOW LOGIC
+# ==========================================
+def open_update_window():
+    update_window = tk.Toplevel(root)
+    update_window.title("Update Library Records")
+    update_window.geometry("600x600")
+    update_window.configure(bg="#1c1c1c")
+    
+    tk.Label(update_window, text="Modify Record Fields", font=("Segoe UI", 24, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
+    
+    # Target Selection Frame (Fetch data by Book ID)
+    fetch_frame = tk.LabelFrame(update_window, text=" Find Record by Book ID ", font=("Segoe UI", 11, "bold"), bg="#1c1c1c", fg="#FFFCC6", bd=2, relief="groove")
+    fetch_frame.pack(padx=40, fill="x", pady=10)
+    
+    tk.Label(fetch_frame, text="Enter Book ID to Modify:", font=("Segoe UI", 12), bg="#1c1c1c", fg="#E1E1E1").grid(row=0, column=0, padx=10, pady=15, sticky="w")
+    search_id_entry = tk.Entry(fetch_frame, font=("Segoe UI", 12), width=15, bg="#2d2d2d", fg="white", insertbackground="white", relief="flat")
+    search_id_entry.grid(row=0, column=1, padx=10, pady=15)
+    
+    # Fields Frame (Disabled until data loaded)
+    fields_frame = tk.Frame(update_window, bg="#1c1c1c")
+    fields_frame.pack(padx=50, fill="x", pady=20)
+    
+    lbl_opts = {"font": ("Segoe UI", 13), "bg": "#1c1c1c", "fg": "#E1E1E1", "anchor": "w"}
+    ent_opts = {"font": ("Segoe UI", 13), "width": 30, "bg": "#2d2d2d", "fg": "white", "insertbackground": "white", "relief": "flat"}
+    
+    tk.Label(fields_frame, text="Book Name:", **lbl_opts).grid(row=0, column=0, sticky="w", pady=8)
+    up_book_name = tk.Entry(fields_frame, **ent_opts)
+    up_book_name.grid(row=0, column=1, pady=8, padx=10)
+    
+    tk.Label(fields_frame, text="Student ID:", **lbl_opts).grid(row=1, column=0, sticky="w", pady=8)
+    up_student_id = tk.Entry(fields_frame, **ent_opts)
+    up_student_id.grid(row=1, column=1, pady=8, padx=10)
+    
+    tk.Label(fields_frame, text="Student Name:", **lbl_opts).grid(row=2, column=0, sticky="w", pady=8)
+    up_student_name = tk.Entry(fields_frame, **ent_opts)
+    up_student_name.grid(row=2, column=1, pady=8, padx=10)
+    
+    tk.Label(fields_frame, text="Date (YYYY-MM-DD):", **lbl_opts).grid(row=3, column=0, sticky="w", pady=8)
+    up_date_issue = tk.Entry(fields_frame, **ent_opts)
+    up_date_issue.grid(row=3, column=1, pady=8, padx=10)
+
+    def fetch_target_record():
+        b_id = search_id_entry.get().strip()
+        if not b_id or not b_id.isdigit():
+            messagebox.showwarning("Input Missing", "Please enter a valid numeric Book ID!")
+            return
+            
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT book_name, student_id, student_name, date_of_issue FROM books_issued WHERE book_id = %s;", (int(b_id),))
+            record = cursor.fetchone()
+            
+            if not record:
+                messagebox.showerror("Not Found", f"No active issue records discovered matching Book ID: {b_id}")
+                return
+                
+            # Clear old entry remnants
+            up_book_name.delete(0, tk.END)
+            up_student_id.delete(0, tk.END)
+            up_student_name.delete(0, tk.END)
+            up_date_issue.delete(0, tk.END)
+            
+            # Map fetched fields into form entries
+            up_book_name.insert(0, record[0])
+            up_student_id.insert(0, record[1])
+            up_student_name.insert(0, record[2])
+            
+            date_val = record[3].strftime('%Y-%m-%d') if isinstance(record[3], datetime) or hasattr(record[3], 'strftime') else str(record[3])
+            up_date_issue.insert(0, date_val)
+            
+            messagebox.showinfo("Loaded", "Record fetched successfully! You can now make changes.")
+            
+        except Error as e:
+            messagebox.showerror("Error", f"Could not read row: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    def commit_updates():
+        b_id = search_id_entry.get().strip()
+        b_name = up_book_name.get().strip()
+        s_id = up_student_id.get().strip()
+        s_name = up_student_name.get().strip()
+        d_issue = up_date_issue.get().strip()
+        
+        if not b_id or not b_name or not s_id or not s_name or not d_issue:
+            messagebox.showwarning("Validation Error", "All fields must be completely filled out before saving updates!")
+            return
+            
+        try:
+            datetime.strptime(d_issue, "%Y-%m-%d")
+        except ValueError:
+            messagebox.showerror("Format Error", "Date must strictly use the YYYY-MM-DD format structure!")
+            return
+            
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            query = """
+                UPDATE books_issued 
+                SET book_name = %s, student_id = %s, student_name = %s, date_of_issue = %s 
+                WHERE book_id = %s;
+            """
+            cursor.execute(query, (b_name, s_id, s_name, d_issue, int(b_id)))
+            conn.commit()
+            
+            messagebox.showinfo("Success", "Library schema modifications saved successfully!")
+            update_window.destroy() # Closes window upon successful commit
+        except Error as e:
+            messagebox.showerror("Database Execution Error", f"Could not update fields: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    fetch_btn = tk.Button(fetch_frame, text="Find/Load", font=("Segoe UI", 10, "bold"), bg="#FFFCC6", fg="black", command=fetch_target_record, relief="flat", width=10)
+    fetch_btn.grid(row=0, column=2, padx=15, pady=15)
+    
+    # Execution buttons
+    save_btn = tk.Button(update_window, text="Save Updates", font=("Segoe UI", 13, "bold"), bg="#4CAF50", fg="black", relief="flat", width=18, command=commit_updates)
+    save_btn.pack(pady=10)
 
 
 # ==========================================
@@ -370,7 +473,7 @@ style.theme_use('clam')
 
 style.configure(
     "Custom.TButton",
-    font=("Segoe UI", 31, "bold"),
+    font=("Segoe UI", 26, "bold"), # Shifted downward slightly from 31 to cleanly fit 5 items safely
     background="#FFFCC6",
     foreground="black",
     borderwidth=0,
@@ -378,16 +481,19 @@ style.configure(
     cursor="hand2"
 )
 
-# --- Sidebar ---
+# --- Sidebar Configuration Layout Property Mapping ---
 regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
+updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
 shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
 exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
-regst.pack(anchor="w", padx=(40, 0), pady=(40, 45))
-srch.pack(anchor="w", padx=(40, 0), pady=(0, 45))
-shtbl.pack(anchor="w", padx=(40, 0), pady=(0, 45))
-exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 45))
+# Re-spaced geometry offsets to keep your side navigation bar tight and beautiful
+regst.pack(anchor="w", padx=(40, 0), pady=(25, 25))
+srch.pack(anchor="w", padx=(40, 0), pady=(0, 25))
+updt.pack(anchor="w", padx=(40, 0), pady=(0, 25))
+shtbl.pack(anchor="w", padx=(40, 0), pady=(0, 25))
+exit_btn.pack(anchor="w", padx=(40, 0), pady=(0, 25))
 
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
 vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
