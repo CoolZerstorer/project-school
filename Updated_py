@@ -20,14 +20,15 @@ def initialize_database():
         cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
         cursor.execute("USE student_db;")
         
-        # Active Records Table
+        # Active Records Table (Added fine column for manual modifications)
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS books_issued (
                 book_id INT PRIMARY KEY,
                 student_id VARCHAR(50) NOT NULL,
                 student_name VARCHAR(100) NOT NULL,
                 date_of_issue DATE NOT NULL,
-                book_name VARCHAR(150) NOT NULL
+                book_name VARCHAR(150) NOT NULL,
+                fine INT DEFAULT 0
             );
         """)
 
@@ -43,6 +44,13 @@ def initialize_database():
                 date_of_return TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
+        
+        # Safeguard: Check if 'fine' column exists in case the table was created previously without it
+        try:
+            cursor.execute("ALTER TABLE books_issued ADD COLUMN fine INT DEFAULT 0;")
+        except Error:
+            pass # Column already exists
+            
         conn.commit()
         cursor.close()
         conn.close()
@@ -117,7 +125,7 @@ def open_register_window():
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
-            query = "INSERT INTO books_issued (book_id, student_id, student_name, date_of_issue, book_name) VALUES (%s, %s, %s, %s, %s);"
+            query = "INSERT INTO books_issued (book_id, student_id, student_name, date_of_issue, book_name, fine) VALUES (%s, %s, %s, %s, %s, 0);"
             cursor.execute(query, (int(b_id), s_id, s_name, d_issue, b_name))
             conn.commit()
             
@@ -277,26 +285,20 @@ def open_tables_window():
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
-            cursor.execute("SELECT book_id, student_id, student_name, date_of_issue, book_name FROM books_issued;")
+            # Pulled the saved manual fine from database
+            cursor.execute("SELECT book_id, student_id, student_name, date_of_issue, book_name, fine FROM books_issued;")
             rows = cursor.fetchall()
             
-            today = datetime.today().date()
-            
             for row in rows:
-                b_id, s_id, s_name, issue_date, b_name = row
+                b_id, s_id, s_name, issue_date, b_name, stored_fine = row
                 
                 if isinstance(issue_date, str):
                     issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
                 else:
                     issue_date_obj = issue_date
 
-                days_passed = (today - issue_date_obj).days
-                
-                if days_passed > 15:
-                    fine_amt = (days_passed - 15) * 100
-                    fine_str = f"₹{fine_amt} ({days_passed - 15} days overdue)"
-                else:
-                    fine_str = "₹0 (Safe)"
+                # Display manually set fine value if it exists, otherwise standard layout
+                fine_str = f"₹{stored_fine}"
                 
                 tree.insert("", tk.END, values=(b_id, s_id, s_name, issue_date_obj.strftime('%Y-%m-%d'), b_name, fine_str))
         except Error as e:
@@ -359,7 +361,7 @@ def open_tables_window():
 def open_update_window():
     update_window = tk.Toplevel(root)
     update_window.title("Update Library Records")
-    update_window.geometry("600x550") 
+    update_window.geometry("600x620") # Expanded slightly to fit fine element cleanly
     update_window.configure(bg="#1c1c1c")
     
     tk.Label(update_window, text="Modify Record Fields", font=("Segoe UI", 24, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
@@ -374,7 +376,7 @@ def open_update_window():
     
     # Fields Frame
     fields_frame = tk.Frame(update_window, bg="#1c1c1c")
-    fields_frame.pack(padx=50, fill="x", pady=20)
+    fields_frame.pack(padx=50, fill="x", pady=15)
     
     lbl_opts = {"font": ("Segoe UI", 13), "bg": "#1c1c1c", "fg": "#E1E1E1", "anchor": "w"}
     ent_opts = {"font": ("Segoe UI", 13), "width": 30, "bg": "#2d2d2d", "fg": "white", "insertbackground": "white", "relief": "flat"}
@@ -395,6 +397,11 @@ def open_update_window():
     up_date_issue = tk.Entry(fields_frame, **ent_opts)
     up_date_issue.grid(row=3, column=1, pady=8, padx=10)
 
+    # NEW: Manual Fine Overwrite Input Field Layout
+    tk.Label(fields_frame, text="Accumulated Fine (₹):", **lbl_opts).grid(row=4, column=0, sticky="w", pady=8)
+    up_fine = tk.Entry(fields_frame, **ent_opts)
+    up_fine.grid(row=4, column=1, pady=8, padx=10)
+
     def fetch_target_record():
         b_id = search_id_entry.get().strip()
         if not b_id or not b_id.isdigit():
@@ -404,7 +411,8 @@ def open_update_window():
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
-            cursor.execute("SELECT book_name, student_id, student_name, date_of_issue FROM books_issued WHERE book_id = %s;", (int(b_id),))
+            # Added fine to the data query selection parameters
+            cursor.execute("SELECT book_name, student_id, student_name, date_of_issue, fine FROM books_issued WHERE book_id = %s;", (int(b_id),))
             record = cursor.fetchone()
             
             if not record:
@@ -415,6 +423,7 @@ def open_update_window():
             up_student_id.delete(0, tk.END)
             up_student_name.delete(0, tk.END)
             up_date_issue.delete(0, tk.END)
+            up_fine.delete(0, tk.END) # Clear fine field
             
             up_book_name.insert(0, record[0])
             up_student_id.insert(0, record[1])
@@ -422,6 +431,7 @@ def open_update_window():
             
             date_val = record[3].strftime('%Y-%m-%d') if isinstance(record[3], datetime) or hasattr(record[3], 'strftime') else str(record[3])
             up_date_issue.insert(0, date_val)
+            up_fine.insert(0, str(record[4])) # Insert fetched database fine value
             
             messagebox.showinfo("Loaded", "Record fetched successfully! You can now make changes.")
             
@@ -438,11 +448,16 @@ def open_update_window():
         s_id = up_student_id.get().strip()
         s_name = up_student_name.get().strip()
         d_issue = up_date_issue.get().strip()
+        f_amt = up_fine.get().strip()
         
-        if not b_id or not b_name or not s_id or not s_name or not d_issue:
+        if not b_id or not b_name or not s_id or not s_name or not d_issue or f_amt == "":
             messagebox.showwarning("Validation Error", "All fields must be completely filled out before saving updates!")
             return
             
+        if not f_amt.isdigit():
+            messagebox.showerror("Input Error", "Fine layout value structure must be a valid whole number integer string!")
+            return
+
         try:
             datetime.strptime(d_issue, "%Y-%m-%d")
         except ValueError:
@@ -452,12 +467,13 @@ def open_update_window():
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
+            # Updated to update fine field values mapping parameters
             query = """
                 UPDATE books_issued 
-                SET book_name = %s, student_id = %s, student_name = %s, date_of_issue = %s 
+                SET book_name = %s, student_id = %s, student_name = %s, date_of_issue = %s, fine = %s 
                 WHERE book_id = %s;
             """
-            cursor.execute(query, (b_name, s_id, s_name, d_issue, int(b_id)))
+            cursor.execute(query, (b_name, s_id, s_name, d_issue, int(f_amt), int(b_id)))
             conn.commit()
             
             messagebox.showinfo("Success", "Library schema modifications saved successfully!")
@@ -555,7 +571,6 @@ style.configure(
     cursor="hand2"
 )
 
-
 # --- Sidebar Configuration Layout ---
 archive_btn = tk.Button(
     root, 
@@ -568,6 +583,7 @@ archive_btn = tk.Button(
     command=open_archive_history_view
 )
 archive_btn.place(relx=0.96, rely=0.94, anchor="se")
+
 regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
 updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
@@ -606,8 +622,5 @@ try:
     lib_image_label.image = lib_image
 except Exception as e:
     print(f"Error loading lib.png: {e}") 
-
-# --- MAIN HOME SCREEN ARCHIVE BUTTON (BOTTOM RIGHT, BLUE) ---
-
 
 root.mainloop()
