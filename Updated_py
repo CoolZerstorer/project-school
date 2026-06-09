@@ -20,6 +20,7 @@ def initialize_database():
         cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
         cursor.execute("USE student_db;")
         
+        # Active Records Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS books_issued (
                 book_id INT PRIMARY KEY,
@@ -27,6 +28,19 @@ def initialize_database():
                 student_name VARCHAR(100) NOT NULL,
                 date_of_issue DATE NOT NULL,
                 book_name VARCHAR(150) NOT NULL
+            );
+        """)
+
+        # Permanent Historical Archive Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS archived_books (
+                archive_id INT AUTO_INCREMENT PRIMARY KEY,
+                book_id INT NOT NULL,
+                student_id VARCHAR(50) NOT NULL,
+                student_name VARCHAR(100) NOT NULL,
+                date_of_issue DATE NOT NULL,
+                book_name VARCHAR(150) NOT NULL,
+                date_of_return TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         """)
         conn.commit()
@@ -300,22 +314,34 @@ def open_tables_window():
             
         record_values = tree.item(selected_item)['values']
         target_book_id = record_values[0]
+        student_id_target = record_values[1]
         student_target = record_values[2] 
+        date_issued_target = record_values[3]
+        book_name_target = record_values[4]
         
-        confirm = messagebox.askyesno("Confirm Return", f"Are you sure you want to mark Book ID {target_book_id} as returned by {student_target}?\nThis removes the record and drops further active fines.")
+        confirm = messagebox.askyesno("Confirm Return", f"Are you sure you want to mark Book ID {target_book_id} as returned by {student_target}?\nThis moves the record to permanent history logs.")
         if not confirm:
             return
 
         try:
             conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
             cursor = conn.cursor()
+            
+            # 1. Transfer record details to archive history storage context logic
+            archive_query = """
+                INSERT INTO archived_books (book_id, student_id, student_name, date_of_issue, book_name)
+                VALUES (%s, %s, %s, %s, %s);
+            """
+            cursor.execute(archive_query, (int(target_book_id), student_id_target, student_target, date_issued_target, book_name_target))
+            
+            # 2. Safely wipe from active table tracking list mapping parameters
             cursor.execute("DELETE FROM books_issued WHERE book_id = %s;", (int(target_book_id),))
             conn.commit()
             
-            messagebox.showinfo("Returned Successfully", "Record wiped clean. Book is available in inventory once again.")
+            messagebox.showinfo("Returned Successfully", "Record archived safely! Book available in active inventory once again.")
             load_table_records()  
         except Error as e:
-            messagebox.showerror("Database Execution Error", f"Could not modify entry schema indices: {e}")
+            messagebox.showerror("Database Execution Error", f"Could not finalize automated history migration tracking details: {e}")
         finally:
             if 'conn' in locals() and conn.is_connected():
                 cursor.close()
@@ -336,7 +362,7 @@ def open_tables_window():
 def open_update_window():
     update_window = tk.Toplevel(root)
     update_window.title("Update Library Records")
-    update_window.geometry("600x600")
+    update_window.geometry("600x650") # Expanded slightly to fit custom bottom spacing cleanly
     update_window.configure(bg="#1c1c1c")
     
     tk.Label(update_window, text="Modify Record Fields", font=("Segoe UI", 24, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
@@ -349,7 +375,7 @@ def open_update_window():
     search_id_entry = tk.Entry(fetch_frame, font=("Segoe UI", 12), width=15, bg="#2d2d2d", fg="white", insertbackground="white", relief="flat")
     search_id_entry.grid(row=0, column=1, padx=10, pady=15)
     
-    # Fields Frame (Disabled until data loaded)
+    # Fields Frame
     fields_frame = tk.Frame(update_window, bg="#1c1c1c")
     fields_frame.pack(padx=50, fill="x", pady=20)
     
@@ -388,13 +414,11 @@ def open_update_window():
                 messagebox.showerror("Not Found", f"No active issue records discovered matching Book ID: {b_id}")
                 return
                 
-            # Clear old entry remnants
             up_book_name.delete(0, tk.END)
             up_student_id.delete(0, tk.END)
             up_student_name.delete(0, tk.END)
             up_date_issue.delete(0, tk.END)
             
-            # Map fetched fields into form entries
             up_book_name.insert(0, record[0])
             up_student_id.insert(0, record[1])
             up_student_name.insert(0, record[2])
@@ -440,7 +464,7 @@ def open_update_window():
             conn.commit()
             
             messagebox.showinfo("Success", "Library schema modifications saved successfully!")
-            update_window.destroy() # Closes window upon successful commit
+            update_window.destroy() 
         except Error as e:
             messagebox.showerror("Database Execution Error", f"Could not update fields: {e}")
         finally:
@@ -451,9 +475,79 @@ def open_update_window():
     fetch_btn = tk.Button(fetch_frame, text="Find/Load", font=("Segoe UI", 10, "bold"), bg="#FFFCC6", fg="black", command=fetch_target_record, relief="flat", width=10)
     fetch_btn.grid(row=0, column=2, padx=15, pady=15)
     
-    # Execution buttons
+    # Save button positioned at top center logic flow area
     save_btn = tk.Button(update_window, text="Save Updates", font=("Segoe UI", 13, "bold"), bg="#4CAF50", fg="black", relief="flat", width=18, command=commit_updates)
-    save_btn.pack(pady=10)
+    save_btn.pack(pady=5)
+
+    # ------------------------------------------------------------------
+    # SUB-FEATURE: PERSISTENT ARCHIVE HISTORY POPUP VIEW WINDOW
+    # ------------------------------------------------------------------
+    def open_archive_history_view():
+        arch_win = tk.Toplevel(update_window)
+        arch_win.title("Permanent History Returns Log Archive")
+        arch_win.geometry("950x500")
+        arch_win.configure(bg="#111111")
+        
+        tk.Label(arch_win, text="📚 Permanent Historical Book Logs Archive", font=("Segoe UI", 18, "bold"), bg="#111111", fg="#007AFF").pack(pady=15)
+        
+        columns = ("arc_id", "b_id", "s_id", "s_name", "iss_date", "b_name", "ret_date")
+        a_tree = ttk.Treeview(arch_win, columns=columns, show="headings", height=14)
+        
+        a_tree.heading("arc_id", text="Log ID")
+        a_tree.heading("b_id", text="Book ID")
+        a_tree.heading("s_id", text="Student ID")
+        a_tree.heading("s_name", text="Student Name")
+        a_tree.heading("iss_date", text="Issue Date")
+        a_tree.heading("b_name", text="Book Name")
+        a_tree.heading("ret_date", text="Returned Timestamp")
+        
+        a_tree.column("arc_id", width=60, anchor="center")
+        a_tree.column("b_id", width=70, anchor="center")
+        a_tree.column("s_id", width=90, anchor="center")
+        a_tree.column("s_name", width=140, anchor="w")
+        a_tree.column("iss_date", width=110, anchor="center")
+        a_tree.column("b_name", width=160, anchor="w")
+        a_tree.column("ret_date", width=180, anchor="center")
+        
+        scroll = ttk.Scrollbar(arch_win, orient="vertical", command=a_tree.yview)
+        a_tree.configure(yscrollcommand=scroll.set)
+        
+        a_tree.pack(side="left", fill="both", expand=True, padx=(20,0), pady=15)
+        scroll.pack(side="right", fill="y", padx=(0,20), pady=15)
+        
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT archive_id, book_id, student_id, student_name, date_of_issue, book_name, date_of_return FROM archived_books ORDER BY date_of_return DESC;")
+            records = cursor.fetchall()
+            
+            for item in records:
+                # Format SQL datetime format patterns cleanly for visual visualization structure mapping 
+                iss_str = item[4].strftime('%Y-%m-%d') if hasattr(item[4], 'strftime') else str(item[4])
+                ret_str = item[6].strftime('%Y-%m-%d %H:%M:%S') if hasattr(item[6], 'strftime') else str(item[6])
+                a_tree.insert("", tk.END, values=(item[0], item[1], item[2], item[3], iss_str, item[5], ret_str))
+        except Error as e:
+            messagebox.showerror("Error Loading Archive", f"Could not sync with structural storage history rows: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    # Absolute positioning constraints for the Blue History Button placed securely at bottom right
+    archive_btn = tk.Button(
+        update_window, 
+        text="Archive History", 
+        font=("Segoe UI", 11, "bold"), 
+        bg="#007AFF", 
+        fg="white", 
+        activebackground="#0051B3",
+        activeforeground="white",
+        relief="flat", 
+        padx=12, 
+        pady=6,
+        command=open_archive_history_view
+    )
+    archive_btn.place(relx=0.95, rely=0.95, anchor="se")
 
 
 # ==========================================
@@ -473,7 +567,7 @@ style.theme_use('clam')
 
 style.configure(
     "Custom.TButton",
-    font=("Segoe UI", 26, "bold"), # Shifted downward slightly from 31 to cleanly fit 5 items safely
+    font=("Segoe UI", 26, "bold"), 
     background="#FFFCC6",
     foreground="black",
     borderwidth=0,
@@ -481,14 +575,13 @@ style.configure(
     cursor="hand2"
 )
 
-# --- Sidebar Configuration Layout Property Mapping ---
+# --- Sidebar ---
 regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
 updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
 shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
 exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
-# Re-spaced geometry offsets to keep your side navigation bar tight and beautiful
 regst.pack(anchor="w", padx=(40, 0), pady=(25, 25))
 srch.pack(anchor="w", padx=(40, 0), pady=(0, 25))
 updt.pack(anchor="w", padx=(40, 0), pady=(0, 25))
