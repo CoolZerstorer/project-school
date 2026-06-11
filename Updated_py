@@ -64,6 +64,85 @@ initialize_database()
 # 2. WINDOW OPENING FUNCTIONS
 # ==========================================
 
+# Master Catalog of 50 Books
+INVENTORY_BOOKS = {
+    101: "The Lord of the Rings", 102: "The Great Gatsby", 103: "To Kill a Mockingbird",
+    104: "1984", 105: "Pride and Prejudice", 106: "The Catcher in the Rye",
+    107: "The Hobbit", 108: "Fahrenheit 451", 109: "Moby Dick", 110: "War and Peace",
+    111: "The Odyssey", 112: "The Divine Comedy", 113: "Crime and Punishment",
+    114: "The Brothers Karamazov", 115: "Brave New World", 116: "The Iliad",
+    117: "Wuthering Heights", 118: "Great Expectations", 119: "Jane Eyre",
+    120: "The Grapes of Wrath", 121: "One Hundred Years of Solitude", 122: "The Sound and the Fury",
+    123: "Lolita", 124: "Ulysses", 125: "Catch-22", 126: "The Picture of Dorian Gray",
+    127: "Frankenstein", 128: "Dracula", 129: "The Shining", 130: "Dune",
+    131: "The Alchemist", 132: "The Book Thief", 133: "The Hunger Games",
+    134: "The Da Vinci Code", 135: "The Chronicles of Narnia", 136: "The Little Prince",
+    137: "Animal Farm", 138: "The Catch in the Rye", 139: "Lord of the Flies",
+    140: "The Metamorphosis", 141: "The Old Man and the Sea", 142: "A Tale of Two Cities",
+    143: "Les Misérables", 144: "Don Quixote", 145: "The Count of Monte Cristo",
+    146: "The Pilgrim's Progress", 147: "Gulliver's Travels", 148: "Robinson Crusoe",
+    149: "Heart of Darkness", 150: "Frankenstein"
+}
+
+
+def open_inventory_window():
+    inv_window = tk.Toplevel(root)
+    inv_window.title("Library Book Inventory View")
+    inv_window.geometry("800x600")
+    inv_window.configure(bg="#1c1c1c")
+
+    tk.Label(inv_window, text="Complete Book Inventory Status", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=15)
+
+    # Setup Table UI Treeview
+    columns = ("book_id", "book_name", "availability")
+    tree = ttk.Treeview(inv_window, columns=columns, show="headings", height=18)
+    
+    tree.heading("book_id", text="Book ID")
+    tree.heading("book_name", text="Book Name")
+    tree.heading("availability", text="Availability Status")
+    
+    tree.column("book_id", width=120, anchor="center")
+    tree.column("book_name", width=380, anchor="w")
+    tree.column("availability", width=240, anchor="center")
+    
+    scrollbar = ttk.Scrollbar(inv_window, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    
+    tree.pack(side="top", fill="both", expand=True, padx=20, pady=10)
+    scrollbar.pack(side="right", fill="y")
+
+    # Fetch currently active issued book IDs from database
+    issued_book_ids = set()
+    try:
+        conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT book_id FROM books_issued;")
+        rows = cursor.fetchall()
+        for row in rows:
+            issued_book_ids.add(row[0])
+    except Error as e:
+        print(f"Error fetching issued list for active inventory layout calculations: {e}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
+
+    # Dynamic styling tag markers for tree items
+    tree.tag_configure('avail', foreground='#4caf50')
+    tree.tag_configure('not_avail', foreground='#ff6b6b')
+
+    # Parse dictionary and insert real-time values
+    for b_id, b_name in sorted(INVENTORY_BOOKS.items()):
+        if b_id in issued_book_ids:
+            status = "NOT AVAILABLE (Issued)"
+            tag_flag = 'not_avail'
+        else:
+            status = "AVAILABLE"
+            tag_flag = 'avail'
+            
+        tree.insert("", tk.END, values=(b_id, b_name, status), tags=(tag_flag,))
+
+
 def open_register_window():
     reg_window = tk.Toplevel(root)
     reg_window.title("Register Student Book Issue")
@@ -161,17 +240,6 @@ def open_search_window():
     search_window.geometry("650x450")
     search_window.configure(bg="#1c1c1c")
     
-    books_dict = {
-        101: "Lord of the rings",
-        102: "The great gatsby",
-        103: "To Kill a Mockingbird",
-        104: "1984",
-        105: "Pride and Prejudice",
-        106: "The Catcher in the Rye",
-        107: "The Hobbit",
-        108: "Fahrenheit 451"
-    }
-    
     tk.Label(search_window, text="Search Book Inventory", font=("Segoe UI", 22, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
     
     search_frame = tk.Frame(search_window, bg="#1c1c1c")
@@ -205,7 +273,7 @@ def open_search_window():
         found_id = None
         found_name = None
         
-        for b_id, b_name in books_dict.items():
+        for b_id, b_name in INVENTORY_BOOKS.items():
             if b_name.lower() == query_name:
                 found_id = b_id
                 found_name = b_name
@@ -598,14 +666,14 @@ def open_login_screen():
 
 root = tk.Tk()
 root.title("Library Unified Network Database")
-root.geometry("1080x640")
+root.geometry("1080x680") # Expanded slightly to easily handle the extra layout button packing
 root.configure(bg="#121212")
 
 # Hide main loop layout safely immediately until login clears
 root.withdraw()
 
-title_label = tk.Label(root, text="HOME", font=("Segoe UI", 63, "bold"), bg="#121212", fg="#E1E1E1")
-title_label.pack(pady=15)
+title_label = tk.Label(root, text="HOME", font=("Segoe UI", 56, "bold"), bg="#121212", fg="#E1E1E1")
+title_label.pack(pady=10)
 
 style = ttk.Style()
 style.theme_use('clam')
@@ -613,7 +681,7 @@ style.theme_use('clam')
 # Configures the default layout state
 style.configure(
     "Custom.TButton",
-    font=("Segoe UI", 31, "bold"), 
+    font=("Segoe UI", 26, "bold"), 
     background="#FFFCC6",
     foreground="black",
     borderwidth=0,
@@ -645,16 +713,19 @@ regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, co
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
 updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
 shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
+invbtn = ttk.Button(root, text="Inventory", style="Custom.TButton", width=15, command=open_inventory_window)
 exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
-regst.pack(side="top", anchor="w", padx=(100, 0), pady=(40, 45))
-srch.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
-updt.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
-shtbl.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
-exit_btn.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+# Clean, uniform side layout grouping
+regst.pack(side="top", anchor="w", padx=(100, 0), pady=(25, 25))
+srch.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
+updt.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
+shtbl.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
+invbtn.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
+exit_btn.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
 
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
-vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
+vertical_line.place(relx=0.5, rely=0.18, relheight=0.9, anchor="n")
 
 # --- IMAGE 1 ---
 try:
