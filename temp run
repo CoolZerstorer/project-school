@@ -93,7 +93,6 @@ def open_inventory_window():
 
     tk.Label(inv_window, text="Complete Book Inventory Status", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=15)
 
-    # Setup Table UI Treeview
     columns = ("book_id", "book_name", "availability")
     tree = ttk.Treeview(inv_window, columns=columns, show="headings", height=18)
     
@@ -111,7 +110,6 @@ def open_inventory_window():
     tree.pack(side="top", fill="both", expand=True, padx=20, pady=10)
     scrollbar.pack(side="right", fill="y")
 
-    # Fetch currently active issued book IDs from database
     issued_book_ids = set()
     try:
         conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
@@ -121,17 +119,15 @@ def open_inventory_window():
         for row in rows:
             issued_book_ids.add(row[0])
     except Error as e:
-        print(f"Error fetching issued list for active inventory layout calculations: {e}")
+        print(f"Error fetching issued list: {e}")
     finally:
         if 'conn' in locals() and conn.is_connected():
             cursor.close()
             conn.close()
 
-    # Dynamic styling tag markers for tree items
     tree.tag_configure('avail', foreground='#4caf50')
     tree.tag_configure('not_avail', foreground='#ff6b6b')
 
-    # Parse dictionary and insert real-time values
     for b_id, b_name in sorted(INVENTORY_BOOKS.items()):
         if b_id in issued_book_ids:
             status = "NOT AVAILABLE (Issued)"
@@ -386,31 +382,56 @@ def open_tables_window():
         date_issued_target = record_values[3]
         book_name_target = record_values[4]
         
-        confirm = messagebox.askyesno("Confirm Return", f"Are you sure you want to mark Book ID {target_book_id} as returned by {student_target}?\nThis moves the record to permanent history logs.")
-        if not confirm:
-            return
+        # --- NEW PASSWORD PROMPT WINDOW FOR DELETING/CLEARING ---
+        pass_prompt = tk.Toplevel(tables_window)
+        pass_prompt.title("Authorization Required")
+        pass_prompt.geometry("360x180")
+        pass_prompt.configure(bg="#222222")
+        pass_prompt.resizable(False, False)
+        pass_prompt.transient(tables_window) # Keeps window attached on top of records screen
+        pass_prompt.grab_set() # Block main window interactions until managed
+        
+        tk.Label(pass_prompt, text="Enter Security Token to Clear Record:", font=("Segoe UI", 11, "bold"), bg="#222222", fg="#FFFCC6").pack(pady=(20, 10))
+        
+        pwd_entry = tk.Entry(pass_prompt, show="*", font=("Segoe UI", 12), bg="#333333", fg="white", insertbackground="white", relief="flat", width=22)
+        pwd_entry.pack(pady=5)
+        pwd_entry.focus()
 
-        try:
-            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
-            cursor = conn.cursor()
-            
-            archive_query = """
-                INSERT INTO archived_books (book_id, student_id, student_name, date_of_issue, book_name)
-                VALUES (%s, %s, %s, %s, %s);
-            """
-            cursor.execute(archive_query, (int(target_book_id), student_id_target, student_target, date_issued_target, book_name_target))
-            
-            cursor.execute("DELETE FROM books_issued WHERE book_id = %s;", (int(target_book_id),))
-            conn.commit()
-            
-            messagebox.showinfo("Returned Successfully", "Record archived safely! Book available in active inventory once again.")
-            load_table_records()  
-        except Error as e:
-            messagebox.showerror("Database Execution Error", f"Could not finalize automated history migration tracking details: {e}")
-        finally:
-            if 'conn' in locals() and conn.is_connected():
-                cursor.close()
-                conn.close()
+        def verify_action():
+            if pwd_entry.get() == "secret123":
+                pass_prompt.destroy() # Close token check block safely
+                
+                # Execute original code functionality safely down matching schemas
+                try:
+                    conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+                    cursor = conn.cursor()
+                    
+                    archive_query = """
+                        INSERT INTO archived_books (book_id, student_id, student_name, date_of_issue, book_name)
+                        VALUES (%s, %s, %s, %s, %s);
+                    """
+                    cursor.execute(archive_query, (int(target_book_id), student_id_target, student_target, date_issued_target, book_name_target))
+                    
+                    cursor.execute("DELETE FROM books_issued WHERE book_id = %s;", (int(target_book_id),))
+                    conn.commit()
+                    
+                    messagebox.showinfo("Returned Successfully", "Record archived safely! Book available in active inventory once again.")
+                    load_table_records()  
+                except Error as e:
+                    messagebox.showerror("Database Execution Error", f"Could not finalize automated history migration: {e}")
+                finally:
+                    if 'conn' in locals() and conn.is_connected():
+                        cursor.close()
+                        conn.close()
+            else:
+                messagebox.showerror("Access Denied", "Incorrect system verification token! Operation terminated.")
+                pwd_entry.delete(0, tk.END)
+
+        # Allow executing verification by hitting the Return key
+        pass_prompt.bind('<Return>', lambda event: verify_action())
+
+        confirm_btn = tk.Button(pass_prompt, text="Verify Access", font=("Segoe UI", 10, "bold"), bg="#4CAF50", fg="black", width=14, relief="flat", command=verify_action)
+        confirm_btn.pack(pady=15)
 
     btn_control_frame = tk.Frame(tables_window, bg="#1c1c1c")
     btn_control_frame.pack(pady=15)
@@ -544,7 +565,8 @@ def open_update_window():
                 conn.close()
 
     fetch_btn = tk.Button(fetch_frame, text="Find/Load", font=("Segoe UI", 10, "bold"), bg="#FFFCC6", fg="black", command=fetch_target_record, relief="flat", width=10)
-    fetch_btn.grid(row=0, column=2, padx=15, pady=15)
+    grid_opts = {"row": 0, "column": 2, "padx": 15, "pady": 15}
+    fetch_btn.grid(**grid_opts)
     
     save_btn = tk.Button(update_window, text="Save Updates", font=("Segoe UI", 13, "bold"), bg="#4CAF50", fg="black", relief="flat", width=18, command=commit_updates)
     save_btn.pack(pady=10)
@@ -666,10 +688,9 @@ def open_login_screen():
 
 root = tk.Tk()
 root.title("Library Unified Network Database")
-root.geometry("1080x680") # Expanded slightly to easily handle the extra layout button packing
+root.geometry("1080x680") 
 root.configure(bg="#121212")
 
-# Hide main loop layout safely immediately until login clears
 root.withdraw()
 
 title_label = tk.Label(root, text="HOME", font=("Segoe UI", 56, "bold"), bg="#121212", fg="#E1E1E1")
@@ -678,7 +699,6 @@ title_label.pack(pady=10)
 style = ttk.Style()
 style.theme_use('clam')
 
-# Configures the default layout state
 style.configure(
     "Custom.TButton",
     font=("Segoe UI", 26, "bold"), 
@@ -688,14 +708,12 @@ style.configure(
     cursor="hand2"
 )
 
-# Enforces permanent black font configuration state during hovering/clicking actions
 style.map(
     "Custom.TButton",
     foreground=[('pressed', 'black'), ('active', 'black')],
     background=[('pressed', '#E6E3B3'), ('active', '#FFFCC6')]
 )
 
-# --- Sidebar Configuration Layout ---
 archive_btn = tk.Button(
     root, 
     text="Archive", 
@@ -708,7 +726,6 @@ archive_btn = tk.Button(
 )
 archive_btn.place(relx=0.96, rely=0.94, anchor="se")
 
-# Reconfigured as highly-styled ttk Elements safely packed without layout crashing tags
 regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
 updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
@@ -716,7 +733,6 @@ shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, comman
 invbtn = ttk.Button(root, text="Inventory", style="Custom.TButton", width=15, command=open_inventory_window)
 exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
-# Clean, uniform side layout grouping
 regst.pack(side="top", anchor="w", padx=(100, 0), pady=(25, 25))
 srch.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
 updt.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
@@ -727,7 +743,6 @@ exit_btn.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
 vertical_line.place(relx=0.5, rely=0.18, relheight=0.9, anchor="n")
 
-# --- IMAGE 1 ---
 try:
     pil_img1 = Image.open("img1.png")
     pil_img1 = pil_img1.resize((120, 90), Image.Resampling.LANCZOS) 
@@ -739,7 +754,6 @@ try:
 except Exception as e:
     print(f"Error loading img1.png: {e}") 
 
-# --- IMAGE 2 ---
 try:
     pil_lib = Image.open("lib.png")
     pil_lib = pil_lib.resize((400, 300), Image.Resampling.LANCZOS)
@@ -751,7 +765,6 @@ try:
 except Exception as e:
     print(f"Error loading lib.png: {e}") 
 
-# Launch secure authorization gatekeeper module
 open_login_screen()
 
 root.mainloop()
