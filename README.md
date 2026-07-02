@@ -2,9 +2,9 @@
 Very Secret Work
 
 ## Members - 
-1) Strack
-2) ZerStorer
-3) S72D10
+1) shantam
+2) keshav
+3) gandu
 
 ##
 Yashan Sir Project
