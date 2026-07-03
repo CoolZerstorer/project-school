@@ -2,9 +2,9 @@
 Very Secret Work
 
 ## Members - 
-1) shantam
-2) keshav
-3) sarthak
+1) Shantam
+2) Keshav
+3) Sarthak
 
 ##
 Yashan Sir Project
