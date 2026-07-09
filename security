@@ -3,7 +3,7 @@ from tkinter import messagebox
 from tkinter import ttk
 import mysql.connector
 from mysql.connector import Error
-from PIL import Image, ImageTk  
+#from PIL import Image, ImageTk  
 from datetime import datetime
 
 # ==========================================
@@ -54,7 +54,12 @@ def initialize_database():
         cursor.close()
         conn.close()
     except Error as e:
+        # If DB init fails, the GUI later will error with missing DB/tables.
         print(f"Database initialization error: {e}")
+        try:
+            messagebox.showerror("Database Initialization Error", f"{e}\n\nLikely cause: MySQL authentication plugin caching_sha2_password is not supported by your installed connector.\nFix: update mysql-connector-python OR change the MySQL user auth plugin to mysql_native_password.")
+        except Exception:
+            pass
 
 # Run setup immediately when script boots up
 initialize_database()
@@ -63,6 +68,81 @@ initialize_database()
 # ==========================================
 # 2. WINDOW OPENING FUNCTIONS
 # ==========================================
+
+# Master Catalog of 50 Books
+INVENTORY_BOOKS = {
+    101: "The Lord of the Rings", 102: "The Great Gatsby", 103: "To Kill a Mockingbird",
+    104: "1984", 105: "Pride and Prejudice", 106: "The Catcher in the Rye",
+    107: "The Hobbit", 108: "Fahrenheit 451", 109: "Moby Dick", 110: "War and Peace",
+    111: "The Odyssey", 112: "The Divine Comedy", 113: "Crime and Punishment",
+    114: "The Brothers Karamazov", 115: "Brave New World", 116: "The Iliad",
+    117: "Wuthering Heights", 118: "Great Expectations", 119: "Jane Eyre",
+    120: "The Grapes of Wrath", 121: "One Hundred Years of Solitude", 122: "The Sound and the Fury",
+    123: "Lolita", 124: "Ulysses", 125: "Catch-22", 126: "The Picture of Dorian Gray",
+    127: "Frankenstein", 128: "Dracula", 129: "The Shining", 130: "Dune",
+    131: "The Alchemist", 132: "The Book Thief", 133: "The Hunger Games",
+    134: "The Da Vinci Code", 135: "The Chronicles of Narnia", 136: "The Little Prince",
+    137: "Animal Farm", 138: "The Catch in the Rye", 139: "Lord of the Flies",
+    140: "The Metamorphosis", 141: "The Old Man and the Sea", 142: "A Tale of Two Cities",
+    143: "Les Misérables", 144: "Don Quixote", 145: "The Count of Monte Cristo",
+    146: "The Pilgrim's Progress", 147: "Gulliver's Travels", 148: "Robinson Crusoe",
+    149: "Heart of Darkness", 150: "Frankenstein"
+}
+
+
+def open_inventory_window():
+    inv_window = tk.Toplevel(root)
+    inv_window.title("Library Book Inventory View")
+    inv_window.geometry("800x600")
+    inv_window.configure(bg="#1c1c1c")
+
+    tk.Label(inv_window, text="Complete Book Inventory Status", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=15)
+
+    columns = ("book_id", "book_name", "availability")
+    tree = ttk.Treeview(inv_window, columns=columns, show="headings", height=18)
+    
+    tree.heading("book_id", text="Book ID")
+    tree.heading("book_name", text="Book Name")
+    tree.heading("availability", text="Availability Status")
+    
+    tree.column("book_id", width=120, anchor="center")
+    tree.column("book_name", width=380, anchor="w")
+    tree.column("availability", width=240, anchor="center")
+    
+    scrollbar = ttk.Scrollbar(inv_window, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    
+    tree.pack(side="top", fill="both", expand=True, padx=20, pady=10)
+    scrollbar.pack(side="right", fill="y")
+
+    issued_book_ids = set()
+    try:
+        conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT book_id FROM books_issued;")
+        rows = cursor.fetchall()
+        for row in rows:
+            issued_book_ids.add(row[0])
+    except Error as e:
+        print(f"Error fetching issued list: {e}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
+
+    tree.tag_configure('avail', foreground='#4caf50')
+    tree.tag_configure('not_avail', foreground='#ff6b6b')
+
+    for b_id, b_name in sorted(INVENTORY_BOOKS.items()):
+        if b_id in issued_book_ids:
+            status = "NOT AVAILABLE (Issued)"
+            tag_flag = 'not_avail'
+        else:
+            status = "AVAILABLE"
+            tag_flag = 'avail'
+            
+        tree.insert("", tk.END, values=(b_id, b_name, status), tags=(tag_flag,))
+
 
 def open_register_window():
     reg_window = tk.Toplevel(root)
@@ -158,94 +238,245 @@ def open_register_window():
 def open_search_window():
     search_window = tk.Toplevel(root)
     search_window.title("Search Library Database")
-    search_window.geometry("650x450")
+    search_window.geometry("650x550")
     search_window.configure(bg="#1c1c1c")
-    
-    books_dict = {
-        101: "Lord of the rings",
-        102: "The great gatsby",
-        103: "To Kill a Mockingbird",
-        104: "1984",
-        105: "Pride and Prejudice",
-        106: "The Catcher in the Rye",
-        107: "The Hobbit",
-        108: "Fahrenheit 451"
-    }
-    
-    tk.Label(search_window, text="Search Book Inventory", font=("Segoe UI", 22, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
-    
+
+    tk.Label(
+        search_window,
+        text="Search Book Inventory",
+        font=("Segoe UI", 22, "bold"),
+        bg="#1c1c1c",
+        fg="#FFFCC6"
+    ).pack(pady=20)
+
     search_frame = tk.Frame(search_window, bg="#1c1c1c")
     search_frame.pack(pady=10)
-    
-    tk.Label(search_frame, text="Enter Book Name:", font=("Segoe UI", 12), bg="#1c1c1c", fg="#E1E1E1").grid(row=0, column=0, padx=10, sticky="w")
-    search_entry = tk.Entry(search_frame, font=("Segoe UI", 12), width=25, bg="#2d2d2d", fg="white", insertbackground="white", relief="flat")
+
+    tk.Label(
+        search_frame,
+        text="Enter Book Name:",
+        font=("Segoe UI", 12),
+        bg="#1c1c1c",
+        fg="#E1E1E1"
+    ).grid(row=0, column=0, padx=10, sticky="w")
+
+    search_entry = tk.Entry(
+        search_frame,
+        font=("Segoe UI", 12),
+        width=25,
+        bg="#2d2d2d",
+        fg="white",
+        insertbackground="white",
+        relief="flat"
+    )
     search_entry.grid(row=0, column=1, padx=10)
-    
-    result_frame = tk.LabelFrame(search_window, text=" Search Results ", font=("Segoe UI", 11, "bold"), bg="#1c1c1c", fg="#FFFCC6", bd=2, relief="groove")
+
+    result_frame = tk.LabelFrame(
+        search_window,
+        text=" Search Results ",
+        font=("Segoe UI", 11, "bold"),
+        bg="#1c1c1c",
+        fg="#FFFCC6",
+        bd=2,
+        relief="groove"
+    )
     result_frame.pack(pady=30, padx=40, fill="both", expand=True)
-    
-    lbl_res_opts = {"font": ("Segoe UI", 13), "bg": "#1c1c1c", "anchor": "w"}
-    
-    id_result_lbl = tk.Label(result_frame, text="Book ID: --", fg="white", **lbl_res_opts)
+
+    lbl_res_opts = {
+        "font": ("Segoe UI", 13),
+        "bg": "#1c1c1c",
+        "anchor": "w"
+    }
+
+    id_result_lbl = tk.Label(
+        result_frame,
+        text="Book ID: --",
+        fg="white",
+        **lbl_res_opts
+    )
     id_result_lbl.pack(fill="x", padx=20, pady=5)
-    
-    name_result_lbl = tk.Label(result_frame, text="Book Name: --", fg="white", **lbl_res_opts)
+
+    name_result_lbl = tk.Label(
+        result_frame,
+        text="Book Name: --",
+        fg="white",
+        **lbl_res_opts
+    )
     name_result_lbl.pack(fill="x", padx=20, pady=5)
-    
-    status_result_lbl = tk.Label(result_frame, text="Availability Status: --", fg="white", **lbl_res_opts)
+
+    student_id_lbl = tk.Label(
+        result_frame,
+        text="Student ID: --",
+        fg="white",
+        **lbl_res_opts
+    )
+    student_id_lbl.pack(fill="x", padx=20, pady=5)
+
+    student_name_lbl = tk.Label(
+        result_frame,
+        text="Student Name: --",
+        fg="white",
+        **lbl_res_opts
+    )
+    student_name_lbl.pack(fill="x", padx=20, pady=5)
+
+    issue_date_lbl = tk.Label(
+        result_frame,
+        text="Issued Date: --",
+        fg="white",
+        **lbl_res_opts
+    )
+    issue_date_lbl.pack(fill="x", padx=20, pady=5)
+
+    status_result_lbl = tk.Label(
+        result_frame,
+        text="Availability Status: --",
+        fg="white",
+        **lbl_res_opts
+    )
     status_result_lbl.pack(fill="x", padx=20, pady=5)
 
     def perform_search():
         query_name = search_entry.get().strip().lower()
-        
+
         if not query_name:
-            messagebox.showwarning("Search Warning", "Please enter a book name to search!")
+            messagebox.showwarning(
+                "Search Warning",
+                "Please enter a book name to search!"
+            )
             return
-        
+
         found_id = None
         found_name = None
-        
-        for b_id, b_name in books_dict.items():
+
+        for b_id, b_name in INVENTORY_BOOKS.items():
             if b_name.lower() == query_name:
                 found_id = b_id
                 found_name = b_name
                 break
-        
+
         if found_id is None:
-            id_result_lbl.config(text="Book ID: Not Found", fg="#f44336")
-            name_result_lbl.config(text=f"Book Name: '{search_entry.get()}' missing from catalog", fg="#f44336")
-            status_result_lbl.config(text="Availability Status: Unknown", fg="#f44336")
+            id_result_lbl.config(
+                text="Book ID: Not Found",
+                fg="#f44336"
+            )
+
+            name_result_lbl.config(
+                text=f"Book Name: '{search_entry.get()}' missing from catalog",
+                fg="#f44336"
+            )
+
+            student_id_lbl.config(
+                text="Student ID: --",
+                fg="#f44336"
+            )
+
+            student_name_lbl.config(
+                text="Student Name: --",
+                fg="#f44336"
+            )
+
+            issue_date_lbl.config(
+                text="Issued Date: --",
+                fg="#f44336"
+            )
+
+            status_result_lbl.config(
+                text="Availability Status: Unknown",
+                fg="#f44336"
+            )
             return
-        
+
         is_issued = False
+        student_id = "--"
+        student_name = "--"
+        issue_date = "--"
+
         try:
-            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            conn = mysql.connector.connect(
+                host="127.0.0.1",
+                user="root",
+                password="root123456",
+                database="student_db"
+            )
+
             cursor = conn.cursor()
-            cursor.execute("SELECT book_id FROM books_issued WHERE book_id = %s;", (found_id,))
+
+            cursor.execute("""
+                SELECT student_id,
+                       student_name,
+                       date_of_issue
+                FROM books_issued
+                WHERE book_id = %s
+            """, (found_id,))
+
             record = cursor.fetchone()
-            
+
             if record:
                 is_issued = True
-                
+                student_id = record[0]
+                student_name = record[1]
+
+                if hasattr(record[2], "strftime"):
+                    issue_date = record[2].strftime("%Y-%m-%d")
+                else:
+                    issue_date = str(record[2])
+
         except Error as e:
             print(f"Database read error during check: {e}")
+
         finally:
             if 'conn' in locals() and conn.is_connected():
                 cursor.close()
                 conn.close()
-                
-        id_result_lbl.config(text=f"Book ID: {found_id}", fg="white")
-        name_result_lbl.config(text=f"Book Name: {found_name}", fg="white")
-        
+
+        id_result_lbl.config(
+            text=f"Book ID: {found_id}",
+            fg="white"
+        )
+
+        name_result_lbl.config(
+            text=f"Book Name: {found_name}",
+            fg="white"
+        )
+
+        student_id_lbl.config(
+            text=f"Student ID: {student_id}",
+            fg="white"
+        )
+
+        student_name_lbl.config(
+            text=f"Student Name: {student_name}",
+            fg="white"
+        )
+
+        issue_date_lbl.config(
+            text=f"Issued Date: {issue_date}",
+            fg="white"
+        )
+
         if is_issued:
-            status_result_lbl.config(text="Availability Status: NOT AVAILABLE (Already Registered/Issued)", fg="#ff6b6b")
+            status_result_lbl.config(
+                text="Availability Status: NOT AVAILABLE (Issued)",
+                fg="#ff6b6b"
+            )
         else:
-            status_result_lbl.config(text="Availability Status: AVAILABLE", fg="#4caf50")
+            status_result_lbl.config(
+                text="Availability Status: AVAILABLE",
+                fg="#4caf50"
+            )
 
-    search_btn = tk.Button(search_frame, text="Search", font=("Segoe UI", 11, "bold"), bg="#FFFCC6", fg="black", command=perform_search, relief="flat", width=10)
+    search_btn = tk.Button(
+        search_frame,
+        text="Search",
+        font=("Segoe UI", 11, "bold"),
+        bg="#FFFCC6",
+        fg="black",
+        command=perform_search,
+        relief="flat",
+        width=10
+    )
     search_btn.grid(row=0, column=2, padx=10)
-
-
 def open_tables_window():
     tables_window = tk.Toplevel(root)
     tables_window.title("Database Tables")
@@ -318,31 +549,56 @@ def open_tables_window():
         date_issued_target = record_values[3]
         book_name_target = record_values[4]
         
-        confirm = messagebox.askyesno("Confirm Return", f"Are you sure you want to mark Book ID {target_book_id} as returned by {student_target}?\nThis moves the record to permanent history logs.")
-        if not confirm:
-            return
+        # --- NEW PASSWORD PROMPT WINDOW FOR DELETING/CLEARING ---
+        pass_prompt = tk.Toplevel(tables_window)
+        pass_prompt.title("Authorization Required")
+        pass_prompt.geometry("360x180")
+        pass_prompt.configure(bg="#222222")
+        pass_prompt.resizable(False, False)
+        pass_prompt.transient(tables_window) # Keeps window attached on top of records screen
+        pass_prompt.grab_set() # Block main window interactions until managed
+        
+        tk.Label(pass_prompt, text="Enter Security Token to Clear Record:", font=("Segoe UI", 11, "bold"), bg="#222222", fg="#FFFCC6").pack(pady=(20, 10))
+        
+        pwd_entry = tk.Entry(pass_prompt, show="*", font=("Segoe UI", 12), bg="#333333", fg="white", insertbackground="white", relief="flat", width=22)
+        pwd_entry.pack(pady=5)
+        pwd_entry.focus()
 
-        try:
-            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
-            cursor = conn.cursor()
-            
-            archive_query = """
-                INSERT INTO archived_books (book_id, student_id, student_name, date_of_issue, book_name)
-                VALUES (%s, %s, %s, %s, %s);
-            """
-            cursor.execute(archive_query, (int(target_book_id), student_id_target, student_target, date_issued_target, book_name_target))
-            
-            cursor.execute("DELETE FROM books_issued WHERE book_id = %s;", (int(target_book_id),))
-            conn.commit()
-            
-            messagebox.showinfo("Returned Successfully", "Record archived safely! Book available in active inventory once again.")
-            load_table_records()  
-        except Error as e:
-            messagebox.showerror("Database Execution Error", f"Could not finalize automated history migration tracking details: {e}")
-        finally:
-            if 'conn' in locals() and conn.is_connected():
-                cursor.close()
-                conn.close()
+        def verify_action():
+            if pwd_entry.get() == "secret123":
+                pass_prompt.destroy() # Close token check block safely
+                
+                # Execute original code functionality safely down matching schemas
+                try:
+                    conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+                    cursor = conn.cursor()
+                    
+                    archive_query = """
+                        INSERT INTO archived_books (book_id, student_id, student_name, date_of_issue, book_name)
+                        VALUES (%s, %s, %s, %s, %s);
+                    """
+                    cursor.execute(archive_query, (int(target_book_id), student_id_target, student_target, date_issued_target, book_name_target))
+                    
+                    cursor.execute("DELETE FROM books_issued WHERE book_id = %s;", (int(target_book_id),))
+                    conn.commit()
+                    
+                    messagebox.showinfo("Returned Successfully", "Record archived safely! Book available in active inventory once again.")
+                    load_table_records()  
+                except Error as e:
+                    messagebox.showerror("Database Execution Error", f"Could not finalize automated history migration: {e}")
+                finally:
+                    if 'conn' in locals() and conn.is_connected():
+                        cursor.close()
+                        conn.close()
+            else:
+                messagebox.showerror("Access Denied", "Incorrect system verification token! Operation terminated.")
+                pwd_entry.delete(0, tk.END)
+
+        # Allow executing verification by hitting the Return key
+        pass_prompt.bind('<Return>', lambda event: verify_action())
+
+        confirm_btn = tk.Button(pass_prompt, text="Verify Access", font=("Segoe UI", 10, "bold"), bg="#4CAF50", fg="black", width=14, relief="flat", command=verify_action)
+        confirm_btn.pack(pady=15)
 
     btn_control_frame = tk.Frame(tables_window, bg="#1c1c1c")
     btn_control_frame.pack(pady=15)
@@ -476,7 +732,8 @@ def open_update_window():
                 conn.close()
 
     fetch_btn = tk.Button(fetch_frame, text="Find/Load", font=("Segoe UI", 10, "bold"), bg="#FFFCC6", fg="black", command=fetch_target_record, relief="flat", width=10)
-    fetch_btn.grid(row=0, column=2, padx=15, pady=15)
+    grid_opts = {"row": 0, "column": 2, "padx": 15, "pady": 15}
+    fetch_btn.grid(**grid_opts)
     
     save_btn = tk.Button(update_window, text="Save Updates", font=("Segoe UI", 13, "bold"), bg="#4CAF50", fg="black", relief="flat", width=18, command=commit_updates)
     save_btn.pack(pady=10)
@@ -526,7 +783,7 @@ def open_archive_history_view():
             ret_str = item[6].strftime('%Y-%m-%d %H:%M:%S') if hasattr(item[6], 'strftime') else str(item[6])
             a_tree.insert("", tk.END, values=(item[0], item[1], item[2], item[3], iss_str, item[5], ret_str))
     except Error as e:
-        messagebox.showerror("Error Loading Archive", f"Could not sync with structural storage history rows: {e}")
+        messagebox.showerror("Error Loading Archive", f"Could not sync with structural storage history rows: {e}\n\nAuth plugin issue: caching_sha2_password is not supported by your current mysql-connector/Python driver.\nConsider updating mysql-connector-python or changing the MySQL user auth plugin.")
     finally:
         if 'conn' in locals() and conn.is_connected():
             cursor.close()
@@ -534,7 +791,7 @@ def open_archive_history_view():
 
 
 # ==========================================
-# 3. SECURE AUTHENTICATION SYSTEM (NEW MODULE)
+# 3. SECURE AUTHENTICATION SYSTEM
 # ==========================================
 def open_login_screen():
     login_win = tk.Toplevel(root)
@@ -542,7 +799,6 @@ def open_login_screen():
     login_win.geometry("400x320")
     login_win.configure(bg="#121212")
     
-    # Handle user clicking the window close button 'X' directly
     def on_login_close():
         root.destroy()
     login_win.protocol("WM_DELETE_WINDOW", on_login_close)
@@ -552,13 +808,11 @@ def open_login_screen():
     lbl_opts = {"font": ("Segoe UI", 11), "bg": "#121212", "fg": "#E1E1E1"}
     ent_opts = {"font": ("Segoe UI", 11), "bg": "#2d2d2d", "fg": "white", "insertbackground": "white", "relief": "flat"}
 
-    # Username Widgets
     tk.Label(login_win, text="Administrator Identity ID:", **lbl_opts).pack(pady=(10, 2))
     username_entry = tk.Entry(login_win, width=28, **ent_opts)
     username_entry.pack(pady=2)
     username_entry.focus()
 
-    # Password Widgets
     tk.Label(login_win, text="System Verification Token:", **lbl_opts).pack(pady=(10, 2))
     
     password_frame = tk.Frame(login_win, bg="#121212")
@@ -570,12 +824,12 @@ def open_login_screen():
     def toggle_password():
         if password_entry.cget("show") == "*":
             password_entry.config(show="")
-            toggle_btn.config(text="Hide", bg="#494949")
+            toggle_btn.config(text="Hide", bg="#000000")
         else:
             password_entry.config(show="*")
-            toggle_btn.config(text="Show", bg="#333333")
+            toggle_btn.config(text="Show", bg="#000000")
 
-    toggle_btn = tk.Button(password_frame, text="Show", font=("Segoe UI", 9, "bold"), command=toggle_password, width=6, bg="#333333", fg="white", relief="flat")
+    toggle_btn = tk.Button(password_frame, text="Show", font=("Segoe UI", 9, "bold"), command=toggle_password, width=6, bg="#333333", fg="black", relief="flat")
     toggle_btn.pack(side=tk.LEFT, padx=(6, 0))
 
     def check_login():
@@ -585,14 +839,13 @@ def open_login_screen():
         if username == "admin" and password == "secret123":
             messagebox.showinfo("Success", "Authorisation Token verified successfully!")
             login_win.destroy()
-            root.deiconify() # Reveal core architecture dashboard window 
+            root.deiconify() 
         else:
             messagebox.showerror("Access Denied", "Invalid administrative identity mapping arrays.")
 
-    # Bind Enter Key directly to trigger authentication process rapidly
     login_win.bind('<Return>', lambda event: check_login())
 
-    login_button = tk.Button(login_win, text="Authenticate System", font=("Segoe UI", 12, "bold"), command=check_login, bg="#007AFF", fg="white", relief="flat", width=20)
+    login_button = tk.Button(login_win, text="Authenticate System", font=("Segoe UI", 12, "bold"), command=check_login, bg="#007AFF", fg="black", relief="flat", width=20)
     login_button.pack(pady=30)
 
 
@@ -602,14 +855,13 @@ def open_login_screen():
 
 root = tk.Tk()
 root.title("Library Unified Network Database")
-root.geometry("1080x640")
+root.geometry("1080x720") 
 root.configure(bg="#121212")
 
-# Completely hide core window matrix arrays initially until login validation clears
 root.withdraw()
 
-title_label = tk.Label(root, text="HOME", font=("Segoe UI", 63, "bold"), bg="#121212", fg="#E1E1E1")
-title_label.pack(pady=15)
+title_label = tk.Label(root, text="HOME", font=("Segoe UI", 60, "bold"), bg="#121212", fg="#E1E1E1")
+title_label.pack(pady=10)
 
 style = ttk.Style()
 style.theme_use('clam')
@@ -620,11 +872,15 @@ style.configure(
     background="#FFFCC6",
     foreground="black",
     borderwidth=0,
-    activeforeground="black",
     cursor="hand2"
 )
 
-# --- Sidebar Configuration Layout ---
+style.map(
+    "Custom.TButton",
+    foreground=[('pressed', 'black'), ('active', 'black')],
+    background=[('pressed', '#E6E3B3'), ('active', '#FFFCC6')]
+)
+
 archive_btn = tk.Button(
     root, 
     text="Archive", 
@@ -641,42 +897,19 @@ regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, co
 srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
 updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
 shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
+invbtn = ttk.Button(root, text="Inventory", style="Custom.TButton", width=15, command=open_inventory_window)
 exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
 
-regst.pack(anchor="w", padx=(100, 0), pady=(40, 45))
-srch.pack(anchor="w", padx=(100, 0), pady=(0, 45))
-updt.pack(anchor="w", padx=(100, 0), pady=(0, 45))
-shtbl.pack(anchor="w", padx=(100, 0), pady=(0, 45))
-exit_btn.pack(anchor="w", padx=(100, 0), pady=(0, 45))
+regst.pack(side="top", anchor="w", padx=(100, 0), pady=(40, 45))
+srch.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+updt.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+shtbl.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+invbtn.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
+exit_btn.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 45))
 
 vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
-vertical_line.place(relx=0.5, rely=0.2, relheight=0.9, anchor="n")
+vertical_line.place(relx=0.5, rely=0.18, relheight=0.9, anchor="n")
 
-# --- IMAGE 1 ---
-try:
-    pil_img1 = Image.open("img1.png")
-    pil_img1 = pil_img1.resize((120, 90), Image.Resampling.LANCZOS) 
-    home_image = ImageTk.PhotoImage(pil_img1)
-
-    image_label = tk.Label(root, image=home_image, bg="#121212")
-    image_label.place(relx=0.71, rely=0.024, anchor="ne")
-    image_label.image = home_image
-except Exception as e:
-    print(f"Error loading img1.png: {e}") 
-
-# --- IMAGE 2 ---
-try:
-    pil_lib = Image.open("lib.png")
-    pil_lib = pil_lib.resize((400, 300), Image.Resampling.LANCZOS)
-    lib_image = ImageTk.PhotoImage(pil_lib)
-
-    lib_image_label = tk.Label(root, image=lib_image, bg="#121212")
-    lib_image_label.place(relx=0.75, rely=0.55, anchor="center")
-    lib_image_label.image = lib_image
-except Exception as e:
-    print(f"Error loading lib.png: {e}") 
-
-# Launch secure authorization sub-layer window loop sequence directly
 open_login_screen()
 
 root.mainloop()
