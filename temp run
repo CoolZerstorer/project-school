@@ -3,7 +3,7 @@ from tkinter import messagebox
 from tkinter import ttk
 import mysql.connector
 from mysql.connector import Error
-from PIL import Image, ImageTk  
+#from PIL import Image, ImageTk  
 from datetime import datetime
 
 # ==========================================
@@ -54,10 +54,22 @@ def initialize_database():
         cursor.close()
         conn.close()
     except Error as e:
+        # If DB init fails, the GUI later will error with missing DB/tables.
         print(f"Database initialization error: {e}")
+        try:
+            messagebox.showerror("Database Initialization Error", f"{e}\n\nLikely cause: MySQL authentication plugin caching_sha2_password is not supported by your installed connector.\nFix: update mysql-connector-python OR change the MySQL user auth plugin to mysql_native_password.")
+        except Exception:
+            pass
 
 # Run setup immediately when script boots up
-initialize_database()
+# (use a helper that shows a GUI error popup if DB creation fails)
+try:
+    from db_init_fix import init_database_with_gui_feedback
+    _db_ok = init_database_with_gui_feedback()
+except Exception:
+    initialize_database()
+    _db_ok = True
+
 
 
 # ==========================================
@@ -233,83 +245,245 @@ def open_register_window():
 def open_search_window():
     search_window = tk.Toplevel(root)
     search_window.title("Search Library Database")
-    search_window.geometry("650x450")
+    search_window.geometry("650x550")
     search_window.configure(bg="#1c1c1c")
-    
-    tk.Label(search_window, text="Search Book Inventory", font=("Segoe UI", 22, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=20)
-    
+
+    tk.Label(
+        search_window,
+        text="Search Book Inventory",
+        font=("Segoe UI", 22, "bold"),
+        bg="#1c1c1c",
+        fg="#FFFCC6"
+    ).pack(pady=20)
+
     search_frame = tk.Frame(search_window, bg="#1c1c1c")
     search_frame.pack(pady=10)
-    
-    tk.Label(search_frame, text="Enter Book Name:", font=("Segoe UI", 12), bg="#1c1c1c", fg="#E1E1E1").grid(row=0, column=0, padx=10, sticky="w")
-    search_entry = tk.Entry(search_frame, font=("Segoe UI", 12), width=25, bg="#2d2d2d", fg="white", insertbackground="white", relief="flat")
+
+    tk.Label(
+        search_frame,
+        text="Enter Book Name:",
+        font=("Segoe UI", 12),
+        bg="#1c1c1c",
+        fg="#E1E1E1"
+    ).grid(row=0, column=0, padx=10, sticky="w")
+
+    search_entry = tk.Entry(
+        search_frame,
+        font=("Segoe UI", 12),
+        width=25,
+        bg="#2d2d2d",
+        fg="white",
+        insertbackground="white",
+        relief="flat"
+    )
     search_entry.grid(row=0, column=1, padx=10)
-    
-    result_frame = tk.LabelFrame(search_window, text=" Search Results ", font=("Segoe UI", 11, "bold"), bg="#1c1c1c", fg="#FFFCC6", bd=2, relief="groove")
+
+    result_frame = tk.LabelFrame(
+        search_window,
+        text=" Search Results ",
+        font=("Segoe UI", 11, "bold"),
+        bg="#1c1c1c",
+        fg="#FFFCC6",
+        bd=2,
+        relief="groove"
+    )
     result_frame.pack(pady=30, padx=40, fill="both", expand=True)
-    
-    lbl_res_opts = {"font": ("Segoe UI", 13), "bg": "#1c1c1c", "anchor": "w"}
-    
-    id_result_lbl = tk.Label(result_frame, text="Book ID: --", fg="white", **lbl_res_opts)
+
+    lbl_res_opts = {
+        "font": ("Segoe UI", 13),
+        "bg": "#1c1c1c",
+        "anchor": "w"
+    }
+
+    id_result_lbl = tk.Label(
+        result_frame,
+        text="Book ID: --",
+        fg="white",
+        **lbl_res_opts
+    )
     id_result_lbl.pack(fill="x", padx=20, pady=5)
-    
-    name_result_lbl = tk.Label(result_frame, text="Book Name: --", fg="white", **lbl_res_opts)
+
+    name_result_lbl = tk.Label(
+        result_frame,
+        text="Book Name: --",
+        fg="white",
+        **lbl_res_opts
+    )
     name_result_lbl.pack(fill="x", padx=20, pady=5)
-    
-    status_result_lbl = tk.Label(result_frame, text="Availability Status: --", fg="white", **lbl_res_opts)
+
+    student_id_lbl = tk.Label(
+        result_frame,
+        text="Student ID: --",
+        fg="white",
+        **lbl_res_opts
+    )
+    student_id_lbl.pack(fill="x", padx=20, pady=5)
+
+    student_name_lbl = tk.Label(
+        result_frame,
+        text="Student Name: --",
+        fg="white",
+        **lbl_res_opts
+    )
+    student_name_lbl.pack(fill="x", padx=20, pady=5)
+
+    issue_date_lbl = tk.Label(
+        result_frame,
+        text="Issued Date: --",
+        fg="white",
+        **lbl_res_opts
+    )
+    issue_date_lbl.pack(fill="x", padx=20, pady=5)
+
+    status_result_lbl = tk.Label(
+        result_frame,
+        text="Availability Status: --",
+        fg="white",
+        **lbl_res_opts
+    )
     status_result_lbl.pack(fill="x", padx=20, pady=5)
 
     def perform_search():
         query_name = search_entry.get().strip().lower()
-        
+
         if not query_name:
-            messagebox.showwarning("Search Warning", "Please enter a book name to search!")
+            messagebox.showwarning(
+                "Search Warning",
+                "Please enter a book name to search!"
+            )
             return
-        
+
         found_id = None
         found_name = None
-        
+
         for b_id, b_name in INVENTORY_BOOKS.items():
             if b_name.lower() == query_name:
                 found_id = b_id
                 found_name = b_name
                 break
-        
+
         if found_id is None:
-            id_result_lbl.config(text="Book ID: Not Found", fg="#f44336")
-            name_result_lbl.config(text=f"Book Name: '{search_entry.get()}' missing from catalog", fg="#f44336")
-            status_result_lbl.config(text="Availability Status: Unknown", fg="#f44336")
+            id_result_lbl.config(
+                text="Book ID: Not Found",
+                fg="#f44336"
+            )
+
+            name_result_lbl.config(
+                text=f"Book Name: '{search_entry.get()}' missing from catalog",
+                fg="#f44336"
+            )
+
+            student_id_lbl.config(
+                text="Student ID: --",
+                fg="#f44336"
+            )
+
+            student_name_lbl.config(
+                text="Student Name: --",
+                fg="#f44336"
+            )
+
+            issue_date_lbl.config(
+                text="Issued Date: --",
+                fg="#f44336"
+            )
+
+            status_result_lbl.config(
+                text="Availability Status: Unknown",
+                fg="#f44336"
+            )
             return
-        
+
         is_issued = False
+        student_id = "--"
+        student_name = "--"
+        issue_date = "--"
+
         try:
-            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            conn = mysql.connector.connect(
+                host="127.0.0.1",
+                user="root",
+                password="root123456",
+                database="student_db"
+            )
+
             cursor = conn.cursor()
-            cursor.execute("SELECT book_id FROM books_issued WHERE book_id = %s;", (found_id,))
+
+            cursor.execute("""
+                SELECT student_id,
+                       student_name,
+                       date_of_issue
+                FROM books_issued
+                WHERE book_id = %s
+            """, (found_id,))
+
             record = cursor.fetchone()
-            
+
             if record:
                 is_issued = True
-                
+                student_id = record[0]
+                student_name = record[1]
+
+                if hasattr(record[2], "strftime"):
+                    issue_date = record[2].strftime("%Y-%m-%d")
+                else:
+                    issue_date = str(record[2])
+
         except Error as e:
             print(f"Database read error during check: {e}")
+
         finally:
             if 'conn' in locals() and conn.is_connected():
                 cursor.close()
                 conn.close()
-                
-        id_result_lbl.config(text=f"Book ID: {found_id}", fg="white")
-        name_result_lbl.config(text=f"Book Name: {found_name}", fg="white")
-        
+
+        id_result_lbl.config(
+            text=f"Book ID: {found_id}",
+            fg="white"
+        )
+
+        name_result_lbl.config(
+            text=f"Book Name: {found_name}",
+            fg="white"
+        )
+
+        student_id_lbl.config(
+            text=f"Student ID: {student_id}",
+            fg="white"
+        )
+
+        student_name_lbl.config(
+            text=f"Student Name: {student_name}",
+            fg="white"
+        )
+
+        issue_date_lbl.config(
+            text=f"Issued Date: {issue_date}",
+            fg="white"
+        )
+
         if is_issued:
-            status_result_lbl.config(text="Availability Status: NOT AVAILABLE (Already Registered/Issued)", fg="#ff6b6b")
+            status_result_lbl.config(
+                text="Availability Status: NOT AVAILABLE (Issued)",
+                fg="#ff6b6b"
+            )
         else:
-            status_result_lbl.config(text="Availability Status: AVAILABLE", fg="#4caf50")
+            status_result_lbl.config(
+                text="Availability Status: AVAILABLE",
+                fg="#4caf50"
+            )
 
-    search_btn = tk.Button(search_frame, text="Search", font=("Segoe UI", 11, "bold"), bg="#FFFCC6", fg="black", command=perform_search, relief="flat", width=10)
+    search_btn = tk.Button(
+        search_frame,
+        text="Search",
+        font=("Segoe UI", 11, "bold"),
+        bg="#FFFCC6",
+        fg="black",
+        command=perform_search,
+        relief="flat",
+        width=10
+    )
     search_btn.grid(row=0, column=2, padx=10)
-
-
 def open_tables_window():
     tables_window = tk.Toplevel(root)
     tables_window.title("Database Tables")
@@ -399,9 +573,7 @@ def open_tables_window():
 
         def verify_action():
             if pwd_entry.get() == "secret123":
-                pass_prompt.destroy() # Close token check block safely
-                
-                # Execute original code functionality safely down matching schemas
+                pass_prompt.destroy()
                 try:
                     conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
                     cursor = conn.cursor()
@@ -616,7 +788,7 @@ def open_archive_history_view():
             ret_str = item[6].strftime('%Y-%m-%d %H:%M:%S') if hasattr(item[6], 'strftime') else str(item[6])
             a_tree.insert("", tk.END, values=(item[0], item[1], item[2], item[3], iss_str, item[5], ret_str))
     except Error as e:
-        messagebox.showerror("Error Loading Archive", f"Could not sync with structural storage history rows: {e}")
+        messagebox.showerror("Error Loading Archive", f"Could not sync with structural storage history rows: {e}\n\nAuth plugin issue: caching_sha2_password is not supported by your current mysql-connector/Python driver.\nConsider updating mysql-connector-python or changing the MySQL user auth plugin.")
     finally:
         if 'conn' in locals() and conn.is_connected():
             cursor.close()
@@ -657,12 +829,12 @@ def open_login_screen():
     def toggle_password():
         if password_entry.cget("show") == "*":
             password_entry.config(show="")
-            toggle_btn.config(text="Hide", bg="#494949")
+            toggle_btn.config(text="Hide", bg="#000000")
         else:
             password_entry.config(show="*")
-            toggle_btn.config(text="Show", bg="#333333")
+            toggle_btn.config(text="Show", bg="#000000")
 
-    toggle_btn = tk.Button(password_frame, text="Show", font=("Segoe UI", 9, "bold"), command=toggle_password, width=6, bg="#333333", fg="white", relief="flat")
+    toggle_btn = tk.Button(password_frame, text="Show", font=("Segoe UI", 9, "bold"), command=toggle_password, width=6, bg="#333333", fg="black", relief="flat")
     toggle_btn.pack(side=tk.LEFT, padx=(6, 0))
 
     def check_login():
@@ -678,7 +850,7 @@ def open_login_screen():
 
     login_win.bind('<Return>', lambda event: check_login())
 
-    login_button = tk.Button(login_win, text="Authenticate System", font=("Segoe UI", 12, "bold"), command=check_login, bg="#007AFF", fg="white", relief="flat", width=20)
+    login_button = tk.Button(login_win, text="Authenticate System", font=("Segoe UI", 12, "bold"), command=check_login, bg="#007AFF", fg="black", relief="flat", width=20)
     login_button.pack(pady=30)
 
 
@@ -688,83 +860,134 @@ def open_login_screen():
 
 root = tk.Tk()
 root.title("Library Unified Network Database")
-root.geometry("1080x680") 
+root.geometry("1080x720") 
 root.configure(bg="#121212")
 
 root.withdraw()
 
-title_label = tk.Label(root, text="HOME", font=("Segoe UI", 56, "bold"), bg="#121212", fg="#E1E1E1")
-title_label.pack(pady=10)
-
+# ==========================
+# Professional Home Layout
+# ==========================
 style = ttk.Style()
 style.theme_use('clam')
 
+# Base colors
+BG = "#121212"
+PANEL = "#1b1f2a"
+ACCENT = "#007AFF"
+TEXT = "#EDEDED"
+MUTED = "#A8B3CF"
+BTN_BG = "#0f172a"
+BTN_FG = "#EDEDED"
+BTN_HOVER = "#1b2a4a"
+
+# Header
+header = tk.Frame(root, bg=BG)
+header.pack(fill="x", pady=(18, 10))
+
+app_title = tk.Label(
+    header,
+    text="Library Unified Network",
+    font=("Segoe UI", 22, "bold"),
+    bg=BG,
+    fg=TEXT
+)
+app_title.pack(side="left", padx=(28, 10))
+
+subtitle = tk.Label(
+    header,
+    text="Catalog • Issue • Search • Archive",
+    font=("Segoe UI", 11),
+    bg=BG,
+    fg=MUTED
+)
+subtitle.pack(side="left")
+
+# Main panel
+main_panel = tk.Frame(root, bg=PANEL, bd=0)
+main_panel.pack(fill="both", expand=True, padx=22, pady=(0, 22))
+
+# Left accent bar
+accent_bar = tk.Frame(main_panel, bg=ACCENT, width=6)
+accent_bar.pack(side="left", fill="y")
+
+# Buttons container
+btn_container = tk.Frame(main_panel, bg=PANEL)
+btn_container.pack(side="left", fill="both", expand=True, padx=22, pady=22)
+
+
+
+# ttk button style (smaller / professional)
 style.configure(
-    "Custom.TButton",
-    font=("Segoe UI", 26, "bold"), 
-    background="#FFFCC6",
-    foreground="black",
+    "Home.TButton",
+    font=("Segoe UI", 11, "bold"),
+    background=BTN_BG,
+    foreground=BTN_FG,
     borderwidth=0,
-    cursor="hand2"
+    relief="flat",
+    padding=(10, 7)
 )
-
 style.map(
-    "Custom.TButton",
-    foreground=[('pressed', 'black'), ('active', 'black')],
-    background=[('pressed', '#E6E3B3'), ('active', '#FFFCC6')]
+    "Home.TButton",
+    background=[('pressed', BTN_HOVER), ('active', BTN_HOVER)],
+    foreground=[('pressed', BTN_FG), ('active', BTN_FG)]
 )
 
-archive_btn = tk.Button(
-    root, 
-    text="Archive", 
-    font=("Segoe UI", 14, "bold"), 
-    background="#59F604",
-    relief="flat", 
-    padx=20, 
-    pady=10,
-    command=open_archive_history_view
+# Grid of actions (use all space: 3 columns)
+actions = [
+    ("Book Issue", open_register_window),
+    ("Search", open_search_window),
+    ("Update", open_update_window),
+    ("Record", open_tables_window),
+    ("Inventory", open_inventory_window),
+    ("Archive", open_archive_history_view),
+]
+
+
+# Exit placed at bottom
+exit_cmd = root.destroy
+
+row = 0
+col = 0
+max_cols = 3
+
+for text, cmd in actions:
+
+    b = ttk.Button(btn_container, text=text, style="Home.TButton", command=cmd)
+    b.grid(row=row, column=col, padx=18, pady=14, sticky="ew")
+    btn_container.grid_columnconfigure(col, weight=1)
+    col += 1
+    if col >= max_cols:
+        col = 0
+        row += 1
+
+# Exit button
+exit_btn = ttk.Button(
+    btn_container,
+    text="Exit",
+    style="Home.TButton",
+    command=exit_cmd
 )
-archive_btn.place(relx=0.96, rely=0.94, anchor="se")
+exit_btn.grid(row=row + 1, column=0, columnspan=2, padx=18, pady=(18, 0), sticky="ew")
 
-regst = ttk.Button(root, text="Book Issue", style="Custom.TButton", width=15, command=open_register_window)
-srch = ttk.Button(root, text="Search", style="Custom.TButton", width=15, command=open_search_window)
-updt = ttk.Button(root, text="Update", style="Custom.TButton", width=15, command=open_update_window)
-shtbl = ttk.Button(root, text="Record", style="Custom.TButton", width=15, command=open_tables_window)
-invbtn = ttk.Button(root, text="Inventory", style="Custom.TButton", width=15, command=open_inventory_window)
-exit_btn = ttk.Button(root, text="Exit", style="Custom.TButton", width=15, command=root.destroy)
+# Right-side info panel
+info_panel = tk.Frame(main_panel, bg=PANEL)
+info_panel.pack(side="right", fill="y", padx=(0, 20), pady=22)
 
-regst.pack(side="top", anchor="w", padx=(100, 0), pady=(25, 25))
-srch.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
-updt.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
-shtbl.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
-invbtn.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
-exit_btn.pack(side="top", anchor="w", padx=(100, 0), pady=(0, 25))
+info_title = tk.Label(info_panel, text="System Status", bg=PANEL, fg=TEXT, font=("Segoe UI", 14, "bold"))
+info_title.pack(anchor="w")
 
-vertical_line = tk.Frame(root, width=6, bg='#007AFF') 
-vertical_line.place(relx=0.5, rely=0.18, relheight=0.9, anchor="n")
+info_text = tk.Label(
+    info_panel,
+    text="Use the actions below to manage the library.\nReturned books move into the archive log.",
+    bg=PANEL,
+    fg=MUTED,
+    font=("Segoe UI", 11),
+    justify="left"
+)
+info_text.pack(anchor="w", pady=(10, 0))
 
-try:
-    pil_img1 = Image.open("img1.png")
-    pil_img1 = pil_img1.resize((120, 90), Image.Resampling.LANCZOS) 
-    home_image = ImageTk.PhotoImage(pil_img1)
-
-    image_label = tk.Label(root, image=home_image, bg="#121212")
-    image_label.place(relx=0.71, rely=0.024, anchor="ne")
-    image_label.image = home_image
-except Exception as e:
-    print(f"Error loading img1.png: {e}") 
-
-try:
-    pil_lib = Image.open("lib.png")
-    pil_lib = pil_lib.resize((400, 300), Image.Resampling.LANCZOS)
-    lib_image = ImageTk.PhotoImage(pil_lib)
-
-    lib_image_label = tk.Label(root, image=lib_image, bg="#121212")
-    lib_image_label.place(relx=0.75, rely=0.55, anchor="center")
-    lib_image_label.image = lib_image
-except Exception as e:
-    print(f"Error loading lib.png: {e}") 
-
+# Login gate
 open_login_screen()
 
 root.mainloop()
