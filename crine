@@ -5,6 +5,78 @@ import mysql.connector
 from mysql.connector import Error
 #from PIL import Image, ImageTk  
 from datetime import datetime
+import random
+
+# ==============================================================================
+# ADVANCED VISUALS: Ambient Particle Core System
+# ==============================================================================
+class KineticCanvas(tk.Canvas):
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.particles = []
+        # Spawn 20 subtle ambient particles
+        for _ in range(20):
+            self.particles.append({
+                "x": random.randint(10, 250),
+                "y": random.randint(10, 400),
+                "dx": random.choice([-0.5, 0.5]),
+                "dy": random.choice([-0.5, 0.5]),
+                "size": random.randint(2, 4),
+                "id": None
+            })
+        self.animate_particles()
+
+    def animate_particles(self):
+        self.delete("particle")
+        width = self.winfo_width()
+        height = self.winfo_height()
+        
+        if width > 10 and height > 10:
+            for p in self.particles:
+                # Update positions based on velocity vectors
+                p["x"] += p["dx"]
+                p["y"] += p["dy"]
+                
+                # Boundary collision physics
+                if p["x"] <= 0 or p["x"] >= width: p["dx"] *= -1
+                if p["y"] <= 0 or p["y"] >= height: p["dy"] *= -1
+                
+                # Render soft glowing slate-blue circles onto the background
+                self.create_oval(
+                    p["x"], p["y"], p["x"]+p["size"], p["y"]+p["size"],
+                    fill="#2a354d", outline="", tags="particle"
+                )
+        # Loop at roughly 60 frames per second
+        self.after(16, self.animate_particles)
+
+import math
+
+class TelemetryWave(tk.Canvas):
+    def __init__(self, parent, **kwargs):
+        super().__init__(parent, **kwargs)
+        self.phase = 0
+        self.draw_wave()
+
+    def draw_wave(self):
+        self.delete("wave")
+        width = self.winfo_width()
+        height = self.winfo_height()
+        
+        if width > 10 and height > 10:
+            points = []
+            for x in range(0, width, 4):
+                # Generates a smooth, organic pulsating wave loop
+                y = (height / 2) + math.sin(x * 0.06 + self.phase) * 6 + math.cos(x * 0.03 + self.phase) * 2
+                points.append((x, y))
+            
+            if len(points) > 1:
+                # Draws a glowing emerald neon tracking line
+                self.create_line(points, fill="#00E676", width=2, smooth=True, tags="wave")
+                
+        self.phase += 0.08  # Speeds up/slows down the wave velocity
+        self.after(25, self.draw_wave)
+
+
 
 # ==========================================
 # 1. DATABASE SETUP LOGIC
@@ -1289,12 +1361,13 @@ btn_container = tk.Frame(main_panel, bg=PANEL)
 btn_container.pack(side="left", fill="both", expand=True, padx=30, pady=30)
 
 # ==============================================================================
-# Right: Advanced Status & Metrics Sidebar Panel
+# Right: Advanced Status & Metrics Sidebar Panel (ANIMATED DEPLOYMENT)
 # ==============================================================================
-status_frame = tk.Frame(main_panel, bg="#141722", width=300)
+status_frame = KineticCanvas(main_panel, bg="#141722", width=300, bd=0, highlightthickness=0)
 status_frame.pack(side="right", fill="both", padx=(0, 20), pady=30)
 status_frame.pack_propagate(False) 
 
+# 1. Main Title Header String (Mapped smoothly onto Canvas layer)
 status_title = tk.Label(
     status_frame, 
     text="SYSTEM STATUS", 
@@ -1303,8 +1376,9 @@ status_title = tk.Label(
     fg=ACCENT,
     anchor="w"
 )
-status_title.pack(fill="x", padx=20, pady=(25, 5))
+status_frame.create_window(20, 25, anchor="nw", window=status_title, width=260)
 
+# 2. Paragraph Description String Layout
 status_desc = tk.Label(
     status_frame, 
     text="Use the action matrix grid to manage items. Returned assets automatically transfer to log indexes.", 
@@ -1315,24 +1389,49 @@ status_desc = tk.Label(
     anchor="nw",
     wraplength=250 
 )
-status_desc.pack(fill="x", padx=20, pady=(0, 25))
+status_frame.create_window(20, 60, anchor="nw", window=status_desc, width=260)
 
-# Live Data Metric Cards (Visual Polish)
-def create_metric_card(parent, label_text, value_text, color):
-    card = tk.Frame(parent, bg="#1c202e", bd=0, highlightbackground="#252b3d", highlightthickness=1)
-    card.pack(fill="x", padx=20, pady=6, ipady=8)
+# ==============================================================================
+# 1. First, define the reusable card builder function
+# ==============================================================================
+def create_metric_card(parent_canvas, label_text, value_text, color, y_position):
+    card = tk.Frame(parent_canvas, bg="#1c202e", bd=0, highlightbackground="#252b3d", highlightthickness=1)
     
     lbl = tk.Label(card, text=label_text, font=("Segoe UI", 9), bg="#1c202e", fg=MUTED, anchor="w")
-    lbl.pack(fill="x", padx=12, pady=(4, 2))
+    lbl.pack(fill="x", padx=12, pady=(8, 2))
     
     val = tk.Label(card, text=value_text, font=("Segoe UI", 14, "bold"), bg="#1c202e", fg=color, anchor="w")
-    val.pack(fill="x", padx=12)
+    val.pack(fill="x", padx=12, pady=(0, 8))
+    
+    parent_canvas.create_window(20, y_position, anchor="nw", window=card, width=260)
 
-create_metric_card(status_frame, "ACTIVE DATABASE", "CONNECTED", "#00E676")
-create_metric_card(status_frame, "SESSION OPERATOR", "ADMINISTRATOR", TEXT)
+# ==============================================================================
+# 2. Second, invoke the builders sequentially down the screen coordinates (Y)
+# ==============================================================================
 
+# Card 1: Top slot at Y=140
+create_metric_card(status_frame, "ACTIVE DATABASE", "CONNECTED", "#00E676", 140)
+
+# Card 2: Middle slot at Y=215
+create_metric_card(status_frame, "SESSION OPERATOR", "ADMINISTRATOR", TEXT, 215)
+
+# Card 3: Telemetry Wave slot safely at the bottom at Y=290
+telemetry_card = tk.Frame(status_frame, bg="#1c202e", bd=0, highlightbackground="#252b3d", highlightthickness=1)
+status_frame.create_window(20, 290, anchor="nw", window=telemetry_card, width=260)
+
+lbl_wave = tk.Label(telemetry_card, text="NETWORK CORE TELEMETRY", font=("Segoe UI", 8, "bold"), bg="#1c202e", fg=MUTED, anchor="w")
+lbl_wave.pack(fill="x", padx=12, pady=(8, 2))
+
+wave_graph = TelemetryWave(telemetry_card, bg="#1c202e", height=35, bd=0, highlightthickness=0)
+wave_graph.pack(fill="x", padx=12, pady=(2, 8))
+
+
+# ==============================================================================
+# Lower Anchor Framework Configuration Slots
+# ==============================================================================
 info_anchor = tk.Frame(status_frame, bg="#141722")
-info_anchor.pack(side="bottom", fill="x", padx=20, pady=(0, 25))
+# Place the info section directly over the bottom of the canvas space
+status_frame.create_window(20, 480, anchor="nw", window=info_anchor, width=260)
 
 def info_enter(e): e.widget.config(bg="#222a3d", fg="#007AFF")
 def info_leave(e): e.widget.config(bg="#1c202e", fg="#A8B3CF")
@@ -1353,6 +1452,8 @@ info_btn = tk.Button(
 info_btn.pack(side="right", ipady=5, ipadx=12)
 info_btn.bind("<Enter>", info_enter)
 info_btn.bind("<Leave>", info_leave)
+
+
 # ==============================================================================
 
 # Your main action setup continues completely untouched:
