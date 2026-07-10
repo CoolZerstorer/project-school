@@ -3,7 +3,6 @@ from tkinter import messagebox
 from tkinter import ttk
 import mysql.connector
 from mysql.connector import Error
-#from PIL import Image, ImageTk  
 from datetime import datetime
 
 # ==========================================
@@ -867,6 +866,7 @@ def open_login_screen():
 import tkinter as tk
 from tkinter import ttk
 import time
+from PIL import Image, ImageTk
 
 root = tk.Tk()
 root.withdraw()
@@ -910,11 +910,12 @@ def update_clock():
     root.after(1000, update_clock)
 
 # ==============================================================================
-# Header Framework
+# Header Framework (Logo Placed on Right with Perfect Spacing)
 # ==============================================================================
 header = tk.Frame(root, bg=BG)
 header.pack(fill="x", pady=(25, 15))
 
+# 1. Title stays on the left (now keeps the master 35px padding)
 app_title = tk.Label(
     header,
     text="Library Unified Network",
@@ -922,8 +923,23 @@ app_title = tk.Label(
     bg=BG,
     fg=TEXT
 )
-app_title.pack(side="left", padx=(35, 15))
+app_title.pack(side="left", padx=(35, 12))
 
+# 2. LOGO: Now packed right after the Title, moving it to the right side
+try:
+    logo_raw = Image.open("logo.png")
+    # Increased width to 46 for a wider, prominent look while maintaining look
+    logo_resized = logo_raw.resize((150, 100), Image.Resampling.LANCZOS)
+    app_logo = ImageTk.PhotoImage(logo_resized)
+    
+    logo_label = tk.Label(header, image=app_logo, bg=BG)
+    # Packs right after the title with a clean 15px gap on its right
+    logo_label.pack(side="right", padx=(0, 75))
+    logo_label.image = app_logo 
+except Exception as e:
+    print(f"Logo tracking skipped: {e}")
+
+# 3. Subtitle follows neatly after the logo
 subtitle = tk.Label(
     header,
     text="Catalog  •  Issue  •  Search  •  Archive",
@@ -1067,5 +1083,5 @@ status_bar_clock.pack(side="right")
 update_clock()
 
 open_login_screen()
-##root.deiconify() # Safely reveal window after canvas is cleanly structured
+
 root.mainloop()
