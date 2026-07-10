@@ -2,19 +2,15 @@ import tkinter as tk
 from tkinter import messagebox
 from tkinter import ttk
 import mysql.connector
-from mysql.connector import Error
-#from PIL import Image, ImageTk  
+from mysql.connector import Error 
 from datetime import datetime
 import random
 
-# ==============================================================================
-# ADVANCED VISUALS: Ambient Particle Core System
-# ==============================================================================
+
 class KineticCanvas(tk.Canvas):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, **kwargs)
         self.particles = []
-        # Spawn 20 subtle ambient particles
         for _ in range(20):
             self.particles.append({
                 "x": random.randint(10, 250),
@@ -33,20 +29,17 @@ class KineticCanvas(tk.Canvas):
         
         if width > 10 and height > 10:
             for p in self.particles:
-                # Update positions based on velocity vectors
                 p["x"] += p["dx"]
                 p["y"] += p["dy"]
                 
-                # Boundary collision physics
                 if p["x"] <= 0 or p["x"] >= width: p["dx"] *= -1
                 if p["y"] <= 0 or p["y"] >= height: p["dy"] *= -1
                 
-                # Render soft glowing slate-blue circles onto the background
                 self.create_oval(
                     p["x"], p["y"], p["x"]+p["size"], p["y"]+p["size"],
                     fill="#2a354d", outline="", tags="particle"
                 )
-        # Loop at roughly 60 frames per second
+
         self.after(16, self.animate_particles)
 
 import math
@@ -65,22 +58,17 @@ class TelemetryWave(tk.Canvas):
         if width > 10 and height > 10:
             points = []
             for x in range(0, width, 4):
-                # Generates a smooth, organic pulsating wave loop
                 y = (height / 2) + math.sin(x * 0.06 + self.phase) * 6 + math.cos(x * 0.03 + self.phase) * 2
                 points.append((x, y))
             
             if len(points) > 1:
-                # Draws a glowing emerald neon tracking line
                 self.create_line(points, fill="#00E676", width=2, smooth=True, tags="wave")
                 
-        self.phase += 0.08  # Speeds up/slows down the wave velocity
+        self.phase += 0.08  
         self.after(25, self.draw_wave)
 
 
-
-# ==========================================
-# 1. DATABASE SETUP LOGIC
-# ==========================================
+# 1. databaaaseee - 
 def initialize_database():
     try:
         conn = mysql.connector.connect(
@@ -92,7 +80,7 @@ def initialize_database():
         cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
         cursor.execute("USE student_db;")
         
-        # Active Records Table
+       
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS books_issued (
                 book_id INT PRIMARY KEY,
@@ -104,7 +92,6 @@ def initialize_database():
             );
         """)
 
-        # Permanent Historical Archive Table
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS archived_books (
                 archive_id INT AUTO_INCREMENT PRIMARY KEY,
@@ -120,21 +107,17 @@ def initialize_database():
         try:
             cursor.execute("ALTER TABLE books_issued ADD COLUMN fine INT DEFAULT 0;")
         except Error:
-            pass # Column already exists
+            pass 
             
         conn.commit()
         cursor.close()
         conn.close()
     except Error as e:
-        # If DB init fails, the GUI later will error with missing DB/tables.
         print(f"Database initialization error: {e}")
         try:
             messagebox.showerror("Database Initialization Error", f"{e}\n\nLikely cause: MySQL authentication plugin caching_sha2_password is not supported by your installed connector.\nFix: update mysql-connector-python OR change the MySQL user auth plugin to mysql_native_password.")
         except Exception:
             pass
-
-# Run setup immediately when script boots up
-# (use a helper that shows a GUI error popup if DB creation fails)
 try:
     from db_init_fix import init_database_with_gui_feedback
     _db_ok = init_database_with_gui_feedback()
@@ -143,12 +126,8 @@ except Exception:
     _db_ok = True
 
 
+# Books, Main Menu wagera etc etc
 
-# ==========================================
-# 2. WINDOW OPENING FUNCTIONS
-# ==========================================
-
-# Master Catalog of 50 Books
 INVENTORY_BOOKS = {
     101: "The Lord of the Rings", 102: "The Great Gatsby", 103: "To Kill a Mockingbird",
     104: "1984", 105: "Pride and Prejudice", 106: "The Catcher in the Rye",
@@ -226,14 +205,13 @@ def open_inventory_window():
 def open_register_window():
     reg_window = tk.Toplevel(root)
     reg_window.title("Register Student Book Issue")
-    reg_window.geometry("620x580") # Slightly wider to prevent text clipping
+    reg_window.geometry("620x580") 
     reg_window.configure(bg="#121212")
     reg_window.resizable(False, False)
-    
-    # Force focus so it stays modal on top
+
     reg_window.grab_set()
 
-    # --- Reusable Colors mapped from your dashboard layout ---
+    # Saare Colors - 
     BG_DARK = "#121212"
     PANEL_BG = "#1b1f2a"
     ACCENT_BLUE = "#007AFF"
@@ -242,20 +220,17 @@ def open_register_window():
     ENTRY_BG = "#242d42"
     ENTRY_BORDER = "#323f5c"
     
-    # Modern Action Button Colors
-    SUBMIT_BG = "#0d6efd"     # Elegant Dashboard Blue
+    SUBMIT_BG = "#0d6efd"     
     SUBMIT_HOVER = "#0b5ed7"
-    CLEAR_BG = "#343a40"      # Sleek Slate Gray
+    CLEAR_BG = "#343a40"     
     CLEAR_HOVER = "#212529"
 
-    # Dynamic Hover Animators
     def on_btn_enter(e, hover_color):
         e.widget.config(bg=hover_color)
 
     def on_btn_leave(e, normal_color):
         e.widget.config(bg=normal_color)
 
-    # 1. Header String
     tk.Label(
         reg_window, 
         text="Book Registration Form", 
@@ -264,20 +239,19 @@ def open_register_window():
         fg=TEXT_WHITE
     ).pack(pady=(30, 20))
 
-    # 2. Main Center Control Card Container
+
     form_card = tk.Frame(reg_window, bg=PANEL_BG, bd=0, highlightbackground=ENTRY_BORDER, highlightthickness=1)
     form_card.pack(padx=35, pady=5, fill="both", expand=True)
 
-    # Invisible interior spacing frame
     grid_container = tk.Frame(form_card, bg=PANEL_BG)
     grid_container.pack(padx=30, pady=25, fill="both", expand=True)
 
-    # Configure grid column weights for balanced horizontal spacing
+
     grid_container.grid_columnconfigure(1, weight=1)
 
     lbl_opts = {"font": ("Segoe UI", 12, "bold"), "bg": PANEL_BG, "fg": MUTED_SLATE, "anchor": "w"}
     
-    # Entry configuration mapping (includes a fine border outline structure)
+
     ent_opts = {
         "font": ("Segoe UI", 12), 
         "bg": ENTRY_BG, 
@@ -289,7 +263,6 @@ def open_register_window():
         "selectbackground": ACCENT_BLUE
     }
 
-    # Draw Text Fields smoothly inside the card framework
     tk.Label(grid_container, text="Book ID :", **lbl_opts).grid(row=0, column=0, sticky="w", pady=10)
     book_id_entry = tk.Entry(grid_container, **ent_opts)
     book_id_entry.grid(row=0, column=1, pady=10, padx=(15, 0), sticky="ew")
@@ -313,7 +286,6 @@ def open_register_window():
     
     date_entry.insert(0, datetime.today().strftime('%Y-%m-%d'))
 
-    # --- Core Mechanics Execution Callbacks ---
     def submit_action():
         b_id = book_id_entry.get().strip()
         s_id = student_id_entry.get().strip()
@@ -359,7 +331,6 @@ def open_register_window():
         book_name_entry.delete(0, tk.END)
         date_entry.insert(0, datetime.today().strftime('%Y-%m-%d'))
 
-    # 3. Action Buttons Alignment Layer Panel
     btn_frame = tk.Frame(reg_window, bg=BG_DARK)
     btn_frame.pack(pady=25)
 
@@ -404,14 +375,14 @@ def open_register_window():
 def open_search_window():
     search_window = tk.Toplevel(root)
     search_window.title("Search Library Database")
-    search_window.geometry("660x600") # Added height for comfortable spacing
+    search_window.geometry("660x600") 
     search_window.configure(bg="#121212")
     search_window.resizable(False, False)
     
-    # Force focus so it stays modal on top
+
     search_window.grab_set()
 
-    # --- Reusable Dashboard Palette Colors ---
+
     BG_DARK = "#121212"
     PANEL_BG = "#1b1f2a"
     ACCENT_BLUE = "#007AFF"
@@ -420,17 +391,17 @@ def open_search_window():
     ENTRY_BG = "#242d42"
     ENTRY_BORDER = "#323f5c"
     
-    # Modern Component Action Colors
+
     SEARCH_BG = "#0d6efd"
     SEARCH_HOVER = "#0b5ed7"
     ERROR_RED = "#ff6b6b"
     SUCCESS_GREEN = "#2ec4b6"
 
-    # Dynamic Hover Animators
+
     def on_btn_enter(e): e.widget.config(bg=SEARCH_HOVER)
     def on_btn_leave(e): e.widget.config(bg=SEARCH_BG)
 
-    # 1. Header Title
+
     tk.Label(
         search_window,
         text="Search Book Inventory",
@@ -439,7 +410,7 @@ def open_search_window():
         fg=TEXT_WHITE
     ).pack(pady=(30, 15))
 
-    # 2. Upper Search Interaction Bar
+
     search_frame = tk.Frame(search_window, bg=BG_DARK)
     search_frame.pack(pady=10, fill="x", padx=40)
     search_frame.grid_columnconfigure(1, weight=1)
@@ -466,7 +437,6 @@ def open_search_window():
     search_entry.grid(row=0, column=1, padx=5, sticky="ew")
     search_entry.focus()
 
-    # 3. Main Modern Display Results Container Card (Replaces the ugly LabelFrame)
     result_card = tk.Frame(
         search_window,
         bg=PANEL_BG,
@@ -476,7 +446,6 @@ def open_search_window():
     )
     result_card.pack(pady=(20, 30), padx=40, fill="both", expand=True)
 
-    # Card Title Anchor Banner
     card_title = tk.Label(
         result_card,
         text="📊  SEARCH METRICS RESULT LOG",
@@ -487,7 +456,7 @@ def open_search_window():
     )
     card_title.pack(fill="x", padx=25, pady=(20, 10))
 
-    # Reusable Label Option Array Mapping
+
     lbl_res_opts = {
         "font": ("Segoe UI", 12),
         "bg": PANEL_BG,
@@ -512,7 +481,7 @@ def open_search_window():
     status_result_lbl = tk.Label(result_card, text="Availability Status:  --", fg=MUTED_SLATE, **lbl_res_opts)
     status_result_lbl.pack(fill="x", padx=25, pady=(6, 20))
 
-    # --- Core Backend Mechanics Logic Wrapper ---
+
     def perform_search():
         query_name = search_entry.get().strip().lower()
 
@@ -572,7 +541,7 @@ def open_search_window():
                 cursor.close()
                 conn.close()
 
-        # Update labels back to crisp standard layouts on success
+
         id_result_lbl.config(text=f"Book ID: {found_id}", fg=TEXT_WHITE)
         name_result_lbl.config(text=f"Book Name: {found_name}", fg=TEXT_WHITE)
         student_id_lbl.config(text=f"Student ID: {student_id}", fg=TEXT_WHITE)
@@ -584,10 +553,9 @@ def open_search_window():
         else:
             status_result_lbl.config(text="Availability Status: 🟢 AVAILABLE IN STORAGE", fg=SUCCESS_GREEN)
 
-    # Bind the Enter key on the entry box to trigger search automatically
     search_window.bind('<Return>', lambda event: perform_search())
 
-    # Pack search button inside input bar cleanly
+
     search_btn = tk.Button(
         search_frame,
         text="🔍 Search",
@@ -614,7 +582,6 @@ def open_tables_window():
     
     tables_window.grab_set()
 
-    # --- Structural Colors ---
     BG_DARK = "#121212"
     PANEL_BG = "#1b1f2a"
     ACCENT_BLUE = "#007AFF"
@@ -625,7 +592,6 @@ def open_tables_window():
     RETURN_BG = "#e63946"      
     RETURN_HOVER = "#bd1f2d"
 
-    # Header Title
     tk.Label(
         tables_window, 
         text="Issued Books Table Records", 
@@ -635,45 +601,44 @@ def open_tables_window():
     ).pack(pady=(25, 10))
 
     table_style = ttk.Style()
-    table_style.theme_use("clam")  # Crucial to override native Windows backgrounds!
+    table_style.theme_use("clam") 
 
-    # 1. Target the complete inner canvas body layout fields
+
     table_style.configure(
         "Treeview",
-        background=PANEL_BG,        # True dark panel background
-        foreground=TEXT_WHITE,      # Bright readable row text
-        fieldbackground=PANEL_BG,   # Forces the empty space below rows to stay dark!
-        rowheight=35,               # Clean vertical cell separation spacing
+        background=PANEL_BG,  
+        foreground=TEXT_WHITE,     
+        fieldbackground=PANEL_BG,   
+        rowheight=35,               
         font=("Segoe UI", 10),
         borderwidth=0
     )
 
-    # 2. Target item row active selection color states
+   
     table_style.map(
         "Treeview",
         background=[('selected', ACCENT_BLUE)],
         foreground=[('selected', 'white')]
     )
 
-    # 3. Target the Header component backgrounds explicitly
     table_style.configure(
         "Treeview.Heading",
-        background="#222a3d",       # Darker metallic header tone
-        foreground=TEXT_WHITE,      # Header text color
+        background="#222a3d",       
+        foreground=TEXT_WHITE,     
         font=("Segoe UI", 10, "bold"),
         relief="flat",
         borderwidth=0,
         padding=8
     )
 
-    # 4. Prevent the header from turning bright white on mouse hover interaction
+
     table_style.map(
         "Treeview.Heading",
         background=[('active', "#2e3b56"), ('pressed', "#1a2333")],
         foreground=[('active', 'white'), ('pressed', 'white')]
     )
 
-    # 5. Restyle the Scrollbar tracking layout component
+
     table_style.configure(
         "Vertical.TScrollbar",
         background="#222a3d",
@@ -683,7 +648,7 @@ def open_tables_window():
         borderwidth=0
     )
 
-    # 2. Main Card Container
+
     table_card = tk.Frame(tables_window, bg=PANEL_BG, bd=0, highlightbackground=ENTRY_BORDER, highlightthickness=1)
     table_card.pack(fill="both", expand=True, padx=35, pady=(10, 15))
 
@@ -710,7 +675,6 @@ def open_tables_window():
     scrollbar.pack(side="right", fill="y")
     tree.pack(side="left", fill="both", expand=True, padx=1, pady=1)
 
-    # --- Core Mechanics Processing Arrays ---
     def load_table_records():
         for item in tree.get_children():
             tree.delete(item)
@@ -752,7 +716,7 @@ def open_tables_window():
         date_issued_target = record_values[3]
         book_name_target = record_values[4]
         
-        # --- PASSWORD PROMPT POPUP WINDOW ---
+
         pass_prompt = tk.Toplevel(tables_window)
         pass_prompt.title("Authorization Required")
         pass_prompt.geometry("380x200")
@@ -825,9 +789,6 @@ def open_tables_window():
         )
         confirm_btn.pack(pady=15, ipady=4)
 
-    # ==============================================================================
-    # Lower Button Bar (FIXED & SPACED)
-    # ==============================================================================
     btn_control_frame = tk.Frame(tables_window, bg=BG_DARK)
     btn_control_frame.pack(pady=1, fill="x", padx=35) # Fill horizontally to give room
 
@@ -844,7 +805,6 @@ def open_tables_window():
         cursor="hand2",
         command=clear_selected_record
     )
-    # CHANGED: Added fill="x" to stretch it out beautifully, and ipady=10 for great thickness
     return_btn.pack(fill="x", ipady=10)
     
     def on_btn_enter(e): e.widget.config(bg=RETURN_HOVER)
@@ -856,17 +816,14 @@ def open_tables_window():
 
 
 def open_developer_credits():
-    # Create a modal popup window
     credits_win = tk.Toplevel(root)
     credits_win.title("System Manifest")
     credits_win.geometry("380x280")
     credits_win.configure(bg="#141722")
     credits_win.resizable(False, False)
     
-    # Force focus so it stays on top safely
     credits_win.grab_set()
 
-    # Title Header
     tk.Label(
         credits_win, 
         text="DEVELOPER MANIFEST", 
@@ -875,20 +832,16 @@ def open_developer_credits():
         fg="#007AFF"
     ).pack(pady=(25, 15))
 
-    # Dev list background card container
     card = tk.Frame(credits_win, bg="#1c202e", highlightbackground="#252b3d", highlightthickness=1)
     card.pack(fill="both", expand=True, padx=25, pady=(0, 20))
 
-    # Options mapping for consistency
     dev_opts = {"font": ("Segoe UI", 11, "bold"), "bg": "#1c202e", "fg": "#EDEDED", "anchor": "w"}
-    lazy_opts = {"font": ("Segoe UI", 11, "italic"), "bg": "#1c202e", "fg": "#A8B3CF", "anchor": "w"}
 
     # Dynamic line elements
     tk.Label(card, text="1) Shantam", **dev_opts).pack(fill="x", padx=20, pady=(18, 6))
     tk.Label(card, text="2) Keshav", **dev_opts).pack(fill="x", padx=20, pady=6)
     tk.Label(card, text="3) Sarthak (He didn't do shit)", **dev_opts).pack(fill="x", padx=20, pady=6)
 
-    # Clean execution dismissal button
     close_btn = tk.Button(
         credits_win, 
         text="Acknowledge", 
@@ -908,13 +861,12 @@ def open_developer_credits():
 def open_update_window():
     update_window = tk.Toplevel(root)
     update_window.title("Update Library Records")
-    update_window.geometry("620x650") # Added spacing for a cleaner visual layout
+    update_window.geometry("620x650") 
     update_window.configure(bg="#121212")
     update_window.resizable(False, False)
     
     update_window.grab_set()
 
-    # --- Reusable Unified Dashboard Palette Colors ---
     BG_DARK = "#121212"
     PANEL_BG = "#1b1f2a"
     ACCENT_BLUE = "#007AFF"
@@ -923,17 +875,16 @@ def open_update_window():
     ENTRY_BG = "#242d42"
     ENTRY_BORDER = "#323f5c"
     
-    # Modern Action Button Colors
-    SAVE_BG = "#0d6efd"       # Premium Dashboard Blue
+    SAVE_BG = "#0d6efd"       
     SAVE_HOVER = "#0b5ed7"
-    LOAD_BG = "#222a3d"       # Sophisticated Secondary Slate
+    LOAD_BG = "#222a3d"      
     LOAD_HOVER = "#2e3b56"
 
-    # Dynamic Hover Animators
+
     def on_btn_enter(e, color): e.widget.config(bg=color)
     def on_btn_leave(e, color): e.widget.config(bg=color)
 
-    # 1. Header Title
+
     tk.Label(
         update_window, 
         text="Modify Record Fields", 
@@ -942,7 +893,7 @@ def open_update_window():
         fg=TEXT_WHITE
     ).pack(pady=(30, 15))
     
-    # 2. Upper Dynamic Record Locator Row
+
     fetch_frame = tk.Frame(update_window, bg=BG_DARK)
     fetch_frame.pack(padx=35, fill="x", pady=5)
     fetch_frame.grid_columnconfigure(1, weight=1)
@@ -969,18 +920,18 @@ def open_update_window():
     search_id_entry.grid(row=0, column=1, padx=5, sticky="ew")
     search_id_entry.focus()
     
-        # 3. Main Center Control Card Container Frame (FIXED SYNTAX)
+
     fields_card = tk.Frame(update_window, bg=PANEL_BG, bd=0, highlightbackground=ENTRY_BORDER, highlightthickness=1)
     fields_card.pack(padx=35, pady=(15, 20), fill="both", expand=True)
 
-    # Invisible layout grid container inside the panel card
+
     grid_container = tk.Frame(fields_card, bg=PANEL_BG)
     grid_container.pack(padx=30, pady=25, fill="both", expand=True)
     grid_container.grid_columnconfigure(1, weight=1)
     
     lbl_opts = {"font": ("Segoe UI", 12, "bold"), "bg": PANEL_BG, "fg": MUTED_SLATE, "anchor": "w"}
     
-    # FIXED: Re-separated the entry configuration flags correctly into valid keys
+
     ent_opts = {
         "font": ("Segoe UI", 12), 
         "bg": ENTRY_BG, 
@@ -1013,7 +964,7 @@ def open_update_window():
     up_fine.grid(row=4, column=1, pady=10, padx=(15, 0), sticky="ew")
 
 
-    # --- Core Mechanics Processing Backend Methods ---
+
     def fetch_target_record():
         b_id = search_id_entry.get().strip()
         if not b_id or not b_id.isdigit():
@@ -1095,10 +1046,10 @@ def open_update_window():
                 cursor.close()
                 conn.close()
 
-    # Automatically map the keyboard Enter key inside the ID search box to run the query
+  
     update_window.bind('<Return>', lambda event: fetch_target_record())
 
-    # Build and map the upper load button
+
     fetch_btn = tk.Button(
         fetch_frame, 
         text="🔍 Find/Load", 
@@ -1117,7 +1068,6 @@ def open_update_window():
     fetch_btn.bind("<Enter>", lambda e: on_btn_enter(e, LOAD_HOVER))
     fetch_btn.bind("<Leave>", lambda e: on_btn_leave(e, LOAD_BG))
     
-    # 4. Lower Command Save Action Framework Layer Panel
     btn_frame = tk.Frame(update_window, bg=BG_DARK)
     btn_frame.pack(pady=20, fill="x", padx=35)
 
@@ -1190,17 +1140,14 @@ def open_archive_history_view():
             cursor.close()
             conn.close()
 
+# VEry Secret Password Authentication System 
 
-# ==========================================
-# 3. SECURE AUTHENTICATION SYSTEM
-# ==========================================
 def open_login_screen():
     login_win = tk.Toplevel(root)
     login_win.title("Secure Gatekeeper System")
     login_win.geometry("400x320")
     login_win.configure(bg="#121212")
-    
-    # Force focus onto the login window so it pops up in front of everything
+
     login_win.grab_set()
     
     def on_login_close():
@@ -1233,7 +1180,6 @@ def open_login_screen():
             password_entry.config(show="*")
             toggle_btn.config(text="Show")
 
-    # FIXED: fg="white" so the button words don't blend into the dark gray background
     toggle_btn = tk.Button(password_frame, text="Show", font=("Segoe UI", 9, "bold"), command=toggle_password, width=6, bg="#333333", fg="white", relief="flat", cursor="hand2")
     toggle_btn.pack(side=tk.LEFT, padx=(6, 0))
 
@@ -1250,16 +1196,10 @@ def open_login_screen():
 
     login_win.bind('<Return>', lambda event: check_login())
 
-    # FIXED: fg="white" to contrast beautiful neon blue accenting
     login_button = tk.Button(login_win, text="Authenticate System", font=("Segoe UI", 12, "bold"), command=check_login, bg="#007AFF", fg="white", relief="flat", width=20, cursor="hand2")
     login_button.pack(pady=30)
 
-
-
-
-# ==========================================
-# 4. TKINTER MAIN INTERFACE AND LAYOUT
-# ==========================================
+# Very BOOTIFUL LAYOUT MAIN MENU FIRE FIRE FIRE
 
 import tkinter as tk
 from tkinter import ttk
@@ -1270,8 +1210,7 @@ root = tk.Tk()
 root.withdraw()
 root.title("Library Unified Network Database")
 root.geometry("1080x720") 
-# Locate this block at the very top of your file and swap out the hex code
-root.configure(bg="#181a20")  # Premium, ultra-deep cosmic slate tint
+root.configure(bg="#181a20")  
 
 BG = "#181a20"
 PANEL = "#1b1f2a"
@@ -1279,17 +1218,13 @@ ACCENT = "#007AFF"
 TEXT = "#EDEDED"
 MUTED = "#A8B3CF"
 
-# Enhanced Interactive Button Colors
 BTN_BG = "#222a3d"      
-BTN_BORDER = "#323f5c"   # Subtly lighter than background for a sleek edge glow
+BTN_BORDER = "#323f5c"  
 BTN_FG = "#FFFFFF"      
 BTN_HOVER = "#2e3b56"   
 EXIT_BG = "#3d1e22"     
 EXIT_HOVER = "#5c262c"  
 
-# ==============================================================================
-# Hover Mechanics & Clock Functions
-# ==============================================================================
 def on_enter(e):
     if e.widget.cget("text").strip().endswith("Exit"):
         e.widget.config(bg=EXIT_HOVER)
@@ -1307,13 +1242,10 @@ def update_clock():
     status_bar_clock.config(text=f" 🕒 System Time: {current_time} ")
     root.after(1000, update_clock)
 
-# ==============================================================================
-# Header Framework (Logo Placed on Right with Perfect Spacing)
-# ==============================================================================
 header = tk.Frame(root, bg=BG)
 header.pack(fill="x", pady=(25, 15))
 
-# 1. Title stays on the left (now keeps the master 35px padding)
+
 app_title = tk.Label(
     header,
     text="Library Unified Network",
@@ -1323,7 +1255,6 @@ app_title = tk.Label(
 )
 app_title.pack(side="left", padx=(35, 12))
 
-# 2. LOGO: Now packed right after the Title, moving it to the right side
 try:
     logo_raw = Image.open("logo.png")
     # Increased width to 46 for a wider, prominent look while maintaining look
@@ -1331,13 +1262,11 @@ try:
     app_logo = ImageTk.PhotoImage(logo_resized)
     
     logo_label = tk.Label(header, image=app_logo, bg=BG)
-    # Packs right after the title with a clean 15px gap on its right
     logo_label.pack(side="right", padx=(0, 75))
     logo_label.image = app_logo 
 except Exception as e:
     print(f"Logo tracking skipped: {e}")
 
-# 3. Subtitle follows neatly after the logo
 subtitle = tk.Label(
     header,
     text="Catalog  •  Issue  •  Search  •  Archive",
@@ -1347,28 +1276,22 @@ subtitle = tk.Label(
 )
 subtitle.pack(side="left", pady=(8, 0))
 
-# ==============================================================================
-# Main Layout Workspace
-# ==============================================================================
+
 main_panel = tk.Frame(root, bg=PANEL, bd=0)
 main_panel.pack(fill="both", expand=True, padx=35, pady=(0, 15))
 
-# Left accent bar accentuating the panel
 accent_bar = tk.Frame(main_panel, bg=ACCENT, width=5)
 accent_bar.pack(side="left", fill="y")
 
-# Left: Responsive Workspace Content 
 btn_container = tk.Frame(main_panel, bg=PANEL)
 btn_container.pack(side="left", fill="both", expand=True, padx=30, pady=30)
 
-# ==============================================================================
-# Right: Advanced Status & Metrics Sidebar Panel (ANIMATED DEPLOYMENT)
-# ==============================================================================
+# Right wala Panel
+
 status_frame = KineticCanvas(main_panel, bg="#141722", width=300, bd=0, highlightthickness=0)
 status_frame.pack(side="right", fill="both", padx=(0, 20), pady=30)
 status_frame.pack_propagate(False) 
 
-# 1. Main Title Header String (Mapped smoothly onto Canvas layer)
 status_title = tk.Label(
     status_frame, 
     text="SYSTEM STATUS", 
@@ -1379,8 +1302,6 @@ status_title = tk.Label(
 )
 status_frame.create_window(20, 25, anchor="nw", window=status_title, width=260)
 
-#=====================
-# 1. Subtle Sub-header Title for your metrics deck
 lbl_analytics = tk.Label(
     status_frame, 
     text="LIVE STORAGE TELEMETRY", 
@@ -1395,15 +1316,10 @@ status_frame.create_window(20, 60, anchor="nw", window=lbl_analytics, width=260)
 progress_track = tk.Frame(status_frame, bg="#1c202e", bd=0, highlightbackground="#252b3d", highlightthickness=1)
 status_frame.create_window(20, 80, anchor="nw", window=progress_track, width=260, height=35)
 
-# Calculate your real database metrics on runtime
-# ==============================================================================
-# LIVE DATABASE TRACKING INJECTION LOOP (CONNECTED TO YOUR EXACT TABLES)
-# ==============================================================================
 active_issues = 0
 total_capacity = len(INVENTORY_BOOKS) if 'INVENTORY_BOOKS' in locals() else 100
 
 try:
-    # 1. Connect to your database
     conn = mysql.connector.connect(
         host="127.0.0.1", 
         user="root", 
@@ -1411,8 +1327,7 @@ try:
         database="student_db"
     )
     cursor = conn.cursor()
-    
-    # 2. Count exactly how many records currently exist in books_issued
+
     cursor.execute("SELECT COUNT(*) FROM books_issued;")
     result = cursor.fetchone()
     if result:
@@ -1423,26 +1338,22 @@ try:
     
 except Exception as e:
     print(f"Telemetry SQL sync resting: {e}")
-    # Local fallback values if the database server is not running during layout testing
     active_issues = 3  
 
-# 3. Calculate percentage and pixel scale matching your progress bar
-# Safety check to avoid division by zero errors
 if total_capacity <= 0: 
     total_capacity = 100
 
 fill_percentage = min(1.0, active_issues / total_capacity)
 fill_width = int(236 * fill_percentage) 
 
-# Draw the actual structural visual progress load bar
+
 progress_bg = tk.Frame(progress_track, bg="#242d42", height=8)
 progress_bg.pack(fill="x", padx=12, pady=8, expand=True)
 
-# Neon blue active capacity indicator tube overlay line
 progress_fill = tk.Frame(progress_bg, bg=ACCENT, width=fill_width, height=8)
 progress_fill.place(x=0, y=0)
 
-# 4. Dynamic digital readout breaking down actual library circulation metrics
+
 lbl_percentage = tk.Label(
     status_frame, 
     text=f"Issued: {active_issues} / {total_capacity} Books ({int(fill_percentage * 100)}%)", 
@@ -1455,9 +1366,6 @@ status_frame.create_window(20, 120, anchor="nw", window=lbl_percentage, width=26
 
 
 
-# ==============================================================================
-# 1. First, define the reusable card builder function
-# ==============================================================================
 def create_metric_card(parent_canvas, label_text, value_text, color, y_position):
     card = tk.Frame(parent_canvas, bg="#1c202e", bd=0, highlightbackground="#252b3d", highlightthickness=1)
     
@@ -1469,17 +1377,13 @@ def create_metric_card(parent_canvas, label_text, value_text, color, y_position)
     
     parent_canvas.create_window(20, y_position, anchor="nw", window=card, width=260)
 
-# ==============================================================================
-# 2. Second, invoke the builders sequentially down the screen coordinates (Y)
-# ==============================================================================
 
-# Card 1: Top slot at Y=140
+
 create_metric_card(status_frame, "ACTIVE DATABASE", "CONNECTED", "#00E676", 160)
 
-# Card 2: Middle slot at Y=215
+
 create_metric_card(status_frame, "SESSION OPERATOR", "ADMINISTRATOR", TEXT, 245)
 
-# Card 3: Telemetry Wave slot safely at the bottom at Y=290
 telemetry_card = tk.Frame(status_frame, bg="#1c202e", bd=0, highlightbackground="#252b3d", highlightthickness=1)
 status_frame.create_window(20, 350, anchor="nw", window=telemetry_card, width=260)
 
@@ -1490,11 +1394,8 @@ wave_graph = TelemetryWave(telemetry_card, bg="#1c202e", height=35, bd=0, highli
 wave_graph.pack(fill="x", padx=12, pady=(2, 8))
 
 
-# ==============================================================================
-# Lower Anchor Framework Configuration Slots
-# ==============================================================================
 info_anchor = tk.Frame(status_frame, bg="#141722")
-# Place the info section directly over the bottom of the canvas space
+
 status_frame.create_window(20, 480, anchor="nw", window=info_anchor, width=260)
 
 def info_enter(e): e.widget.config(bg="#222a3d", fg="#007AFF")
@@ -1517,10 +1418,6 @@ info_btn.pack(side="right", ipady=5, ipadx=12)
 info_btn.bind("<Enter>", info_enter)
 info_btn.bind("<Leave>", info_leave)
 
-
-# ==============================================================================
-
-# Your main action setup continues completely untouched:
 actions = [
     ("🔷  Book Issue", open_register_window),  
     ("🔍  Search", open_search_window),       
@@ -1550,7 +1447,7 @@ for text, cmd in actions:
         activeforeground=BTN_FG,
         bd=0,                     
         relief="flat",
-        highlightbackground=BTN_BORDER, # Clean inner outline border
+        highlightbackground=BTN_BORDER, 
         highlightthickness=1,
         cursor="hand2"            
     )
@@ -1564,7 +1461,6 @@ for text, cmd in actions:
         col = 0
         row += 1
 
-# Exit Button
 exit_btn = tk.Button(
     btn_container, 
     text="❌  Exit", 
@@ -1582,9 +1478,7 @@ exit_btn.grid(row=row, column=0, columnspan=max_cols, padx=12, pady=(25, 12), st
 exit_btn.bind("<Enter>", on_enter)
 exit_btn.bind("<Leave>", on_leave)
 
-# ==============================================================================
-# Bottom Dashboard Status Bar
-# ==============================================================================
+
 status_bar = tk.Frame(root, bg="#161616", height=25)
 status_bar.pack(side="bottom", fill="x")
 
