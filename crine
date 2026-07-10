@@ -1267,7 +1267,7 @@ import time
 from PIL import Image, ImageTk
 
 root = tk.Tk()
-#root.withdraw()
+root.withdraw()
 root.title("Library Unified Network Database")
 root.geometry("1080x720") 
 # Locate this block at the very top of your file and swap out the hex code
@@ -1596,5 +1596,5 @@ status_bar_clock.pack(side="right")
 
 update_clock()
 
-#open_login_screen()
+open_login_screen()
 root.mainloop()
