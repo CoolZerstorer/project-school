@@ -1256,6 +1256,7 @@ def open_login_screen():
 
 
 
+
 # ==========================================
 # 4. TKINTER MAIN INTERFACE AND LAYOUT
 # ==========================================
@@ -1269,10 +1270,10 @@ root = tk.Tk()
 #root.withdraw()
 root.title("Library Unified Network Database")
 root.geometry("1080x720") 
-root.configure(bg="#121212")
+# Locate this block at the very top of your file and swap out the hex code
+root.configure(bg="#181a20")  # Premium, ultra-deep cosmic slate tint
 
-# Base colors
-BG = "#121212"
+BG = "#181a20"
 PANEL = "#1b1f2a"
 ACCENT = "#007AFF"
 TEXT = "#EDEDED"
@@ -1413,11 +1414,11 @@ def create_metric_card(parent_canvas, label_text, value_text, color, y_position)
 create_metric_card(status_frame, "ACTIVE DATABASE", "CONNECTED", "#00E676", 140)
 
 # Card 2: Middle slot at Y=215
-create_metric_card(status_frame, "SESSION OPERATOR", "ADMINISTRATOR", TEXT, 215)
+create_metric_card(status_frame, "SESSION OPERATOR", "ADMINISTRATOR", TEXT, 230)
 
 # Card 3: Telemetry Wave slot safely at the bottom at Y=290
 telemetry_card = tk.Frame(status_frame, bg="#1c202e", bd=0, highlightbackground="#252b3d", highlightthickness=1)
-status_frame.create_window(20, 290, anchor="nw", window=telemetry_card, width=260)
+status_frame.create_window(20, 385, anchor="nw", window=telemetry_card, width=260)
 
 lbl_wave = tk.Label(telemetry_card, text="NETWORK CORE TELEMETRY", font=("Segoe UI", 8, "bold"), bg="#1c202e", fg=MUTED, anchor="w")
 lbl_wave.pack(fill="x", padx=12, pady=(8, 2))
@@ -1530,9 +1531,7 @@ status_bar_left.pack(side="left")
 status_bar_clock = tk.Label(status_bar, text="", font=("Segoe UI", 9), bg="#161616", fg=MUTED)
 status_bar_clock.pack(side="right")
 
-# Start background dynamic tasks
 update_clock()
 
 #open_login_screen()
-##root.deiconify() # Safely reveal window after canvas is cleanly structured
 root.mainloop()
