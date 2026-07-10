@@ -1,0 +1,1437 @@
+import tkinter as tk
+from tkinter import messagebox
+from tkinter import ttk
+import mysql.connector
+from mysql.connector import Error
+#from PIL import Image, ImageTk  
+from datetime import datetime
+
+# ==========================================
+# 1. DATABASE SETUP LOGIC
+# ==========================================
+def initialize_database():
+    try:
+        conn = mysql.connector.connect(
+            host="127.0.0.1",
+            user="root",
+            password="root123456"
+        )
+        cursor = conn.cursor()
+        cursor.execute("CREATE DATABASE IF NOT EXISTS student_db;")
+        cursor.execute("USE student_db;")
+        
+        # Active Records Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS books_issued (
+                book_id INT PRIMARY KEY,
+                student_id VARCHAR(50) NOT NULL,
+                student_name VARCHAR(100) NOT NULL,
+                date_of_issue DATE NOT NULL,
+                book_name VARCHAR(150) NOT NULL,
+                fine INT DEFAULT 0
+            );
+        """)
+
+        # Permanent Historical Archive Table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS archived_books (
+                archive_id INT AUTO_INCREMENT PRIMARY KEY,
+                book_id INT NOT NULL,
+                student_id VARCHAR(50) NOT NULL,
+                student_name VARCHAR(100) NOT NULL,
+                date_of_issue DATE NOT NULL,
+                book_name VARCHAR(150) NOT NULL,
+                date_of_return TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        """)
+        
+        try:
+            cursor.execute("ALTER TABLE books_issued ADD COLUMN fine INT DEFAULT 0;")
+        except Error:
+            pass # Column already exists
+            
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Error as e:
+        # If DB init fails, the GUI later will error with missing DB/tables.
+        print(f"Database initialization error: {e}")
+        try:
+            messagebox.showerror("Database Initialization Error", f"{e}\n\nLikely cause: MySQL authentication plugin caching_sha2_password is not supported by your installed connector.\nFix: update mysql-connector-python OR change the MySQL user auth plugin to mysql_native_password.")
+        except Exception:
+            pass
+
+# Run setup immediately when script boots up
+# (use a helper that shows a GUI error popup if DB creation fails)
+try:
+    from db_init_fix import init_database_with_gui_feedback
+    _db_ok = init_database_with_gui_feedback()
+except Exception:
+    initialize_database()
+    _db_ok = True
+
+
+
+# ==========================================
+# 2. WINDOW OPENING FUNCTIONS
+# ==========================================
+
+# Master Catalog of 50 Books
+INVENTORY_BOOKS = {
+    101: "The Lord of the Rings", 102: "The Great Gatsby", 103: "To Kill a Mockingbird",
+    104: "1984", 105: "Pride and Prejudice", 106: "The Catcher in the Rye",
+    107: "The Hobbit", 108: "Fahrenheit 451", 109: "Moby Dick", 110: "War and Peace",
+    111: "The Odyssey", 112: "The Divine Comedy", 113: "Crime and Punishment",
+    114: "The Brothers Karamazov", 115: "Brave New World", 116: "The Iliad",
+    117: "Wuthering Heights", 118: "Great Expectations", 119: "Jane Eyre",
+    120: "The Grapes of Wrath", 121: "One Hundred Years of Solitude", 122: "The Sound and the Fury",
+    123: "Lolita", 124: "Ulysses", 125: "Catch-22", 126: "The Picture of Dorian Gray",
+    127: "Frankenstein", 128: "Dracula", 129: "The Shining", 130: "Dune",
+    131: "The Alchemist", 132: "The Book Thief", 133: "The Hunger Games",
+    134: "The Da Vinci Code", 135: "The Chronicles of Narnia", 136: "The Little Prince",
+    137: "Animal Farm", 138: "The Catch in the Rye", 139: "Lord of the Flies",
+    140: "The Metamorphosis", 141: "The Old Man and the Sea", 142: "A Tale of Two Cities",
+    143: "Les Misérables", 144: "Don Quixote", 145: "The Count of Monte Cristo",
+    146: "The Pilgrim's Progress", 147: "Gulliver's Travels", 148: "Robinson Crusoe",
+    149: "Heart of Darkness", 150: "Frankenstein"
+}
+
+
+def open_inventory_window():
+    inv_window = tk.Toplevel(root)
+    inv_window.title("Library Book Inventory View")
+    inv_window.geometry("800x600")
+    inv_window.configure(bg="#1c1c1c")
+
+    tk.Label(inv_window, text="Complete Book Inventory Status", font=("Segoe UI", 20, "bold"), bg="#1c1c1c", fg="#FFFCC6").pack(pady=15)
+
+    columns = ("book_id", "book_name", "availability")
+    tree = ttk.Treeview(inv_window, columns=columns, show="headings", height=18)
+    
+    tree.heading("book_id", text="Book ID")
+    tree.heading("book_name", text="Book Name")
+    tree.heading("availability", text="Availability Status")
+    
+    tree.column("book_id", width=120, anchor="center")
+    tree.column("book_name", width=380, anchor="w")
+    tree.column("availability", width=240, anchor="center")
+    
+    scrollbar = ttk.Scrollbar(inv_window, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    
+    tree.pack(side="top", fill="both", expand=True, padx=20, pady=10)
+    scrollbar.pack(side="right", fill="y")
+
+    issued_book_ids = set()
+    try:
+        conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT book_id FROM books_issued;")
+        rows = cursor.fetchall()
+        for row in rows:
+            issued_book_ids.add(row[0])
+    except Error as e:
+        print(f"Error fetching issued list: {e}")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
+
+    tree.tag_configure('avail', foreground='#4caf50')
+    tree.tag_configure('not_avail', foreground='#ff6b6b')
+
+    for b_id, b_name in sorted(INVENTORY_BOOKS.items()):
+        if b_id in issued_book_ids:
+            status = "NOT AVAILABLE (Issued)"
+            tag_flag = 'not_avail'
+        else:
+            status = "AVAILABLE"
+            tag_flag = 'avail'
+            
+        tree.insert("", tk.END, values=(b_id, b_name, status), tags=(tag_flag,))
+
+
+def open_register_window():
+    reg_window = tk.Toplevel(root)
+    reg_window.title("Register Student Book Issue")
+    reg_window.geometry("620x580") # Slightly wider to prevent text clipping
+    reg_window.configure(bg="#121212")
+    reg_window.resizable(False, False)
+    
+    # Force focus so it stays modal on top
+    reg_window.grab_set()
+
+    # --- Reusable Colors mapped from your dashboard layout ---
+    BG_DARK = "#121212"
+    PANEL_BG = "#1b1f2a"
+    ACCENT_BLUE = "#007AFF"
+    TEXT_WHITE = "#EDEDED"
+    MUTED_SLATE = "#A8B3CF"
+    ENTRY_BG = "#242d42"
+    ENTRY_BORDER = "#323f5c"
+    
+    # Modern Action Button Colors
+    SUBMIT_BG = "#0d6efd"     # Elegant Dashboard Blue
+    SUBMIT_HOVER = "#0b5ed7"
+    CLEAR_BG = "#343a40"      # Sleek Slate Gray
+    CLEAR_HOVER = "#212529"
+
+    # Dynamic Hover Animators
+    def on_btn_enter(e, hover_color):
+        e.widget.config(bg=hover_color)
+
+    def on_btn_leave(e, normal_color):
+        e.widget.config(bg=normal_color)
+
+    # 1. Header String
+    tk.Label(
+        reg_window, 
+        text="Book Registration Form", 
+        font=("Segoe UI", 24, "bold"), 
+        bg=BG_DARK, 
+        fg=TEXT_WHITE
+    ).pack(pady=(30, 20))
+
+    # 2. Main Center Control Card Container
+    form_card = tk.Frame(reg_window, bg=PANEL_BG, bd=0, highlightbackground=ENTRY_BORDER, highlightthickness=1)
+    form_card.pack(padx=35, pady=5, fill="both", expand=True)
+
+    # Invisible interior spacing frame
+    grid_container = tk.Frame(form_card, bg=PANEL_BG)
+    grid_container.pack(padx=30, pady=25, fill="both", expand=True)
+
+    # Configure grid column weights for balanced horizontal spacing
+    grid_container.grid_columnconfigure(1, weight=1)
+
+    lbl_opts = {"font": ("Segoe UI", 12, "bold"), "bg": PANEL_BG, "fg": MUTED_SLATE, "anchor": "w"}
+    
+    # Entry configuration mapping (includes a fine border outline structure)
+    ent_opts = {
+        "font": ("Segoe UI", 12), 
+        "bg": ENTRY_BG, 
+        "fg": "white", 
+        "insertbackground": "white", 
+        "relief": "flat",
+        "highlightbackground": ENTRY_BORDER,
+        "highlightthickness": 1,
+        "selectbackground": ACCENT_BLUE
+    }
+
+    # Draw Text Fields smoothly inside the card framework
+    tk.Label(grid_container, text="Book ID :", **lbl_opts).grid(row=0, column=0, sticky="w", pady=10)
+    book_id_entry = tk.Entry(grid_container, **ent_opts)
+    book_id_entry.grid(row=0, column=1, pady=10, padx=(15, 0), sticky="ew")
+    book_id_entry.focus()
+
+    tk.Label(grid_container, text="Book Name:", **lbl_opts).grid(row=1, column=0, sticky="w", pady=10)
+    book_name_entry = tk.Entry(grid_container, **ent_opts)
+    book_name_entry.grid(row=1, column=1, pady=10, padx=(15, 0), sticky="ew")
+
+    tk.Label(grid_container, text="Student ID:", **lbl_opts).grid(row=2, column=0, sticky="w", pady=10)
+    student_id_entry = tk.Entry(grid_container, **ent_opts)
+    student_id_entry.grid(row=2, column=1, pady=10, padx=(15, 0), sticky="ew")
+
+    tk.Label(grid_container, text="Student Name:", **lbl_opts).grid(row=3, column=0, sticky="w", pady=10)
+    student_name_entry = tk.Entry(grid_container, **ent_opts)
+    student_name_entry.grid(row=3, column=1, pady=10, padx=(15, 0), sticky="ew")
+
+    tk.Label(grid_container, text="Date Issued:", **lbl_opts).grid(row=4, column=0, sticky="w", pady=10)
+    date_entry = tk.Entry(grid_container, **ent_opts)
+    date_entry.grid(row=4, column=1, pady=10, padx=(15, 0), sticky="ew")
+    
+    date_entry.insert(0, datetime.today().strftime('%Y-%m-%d'))
+
+    # --- Core Mechanics Execution Callbacks ---
+    def submit_action():
+        b_id = book_id_entry.get().strip()
+        s_id = student_id_entry.get().strip()
+        s_name = student_name_entry.get().strip()
+        b_name = book_name_entry.get().strip()
+        d_issue = date_entry.get().strip()
+        
+        if not b_id or not s_id or not s_name or not d_issue or not b_name:
+            messagebox.showwarning("Missing Information", "Please fill out all fields before submitting!")
+            return
+        
+        if not b_id.isdigit():
+            messagebox.showerror("Input Error", "Book ID must be a valid integer number!")
+            return
+            
+        try:
+            datetime.strptime(d_issue, "%Y-%m-%d")
+        except ValueError:
+            messagebox.showerror("Format Error", "Date must strictly use the YYYY-MM-DD format!")
+            return
+
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            query = "INSERT INTO books_issued (book_id, student_id, student_name, date_of_issue, book_name, fine) VALUES (%s, %s, %s, %s, %s, 0);"
+            cursor.execute(query, (int(b_id), s_id, s_name, d_issue, b_name))
+            conn.commit()
+            
+            messagebox.showinfo("Success", f"Successfully registered record for {s_name}!")
+            clear_action()
+        except mysql.connector.Error as err:
+            messagebox.showerror("Database Error", f"Failed to save record: {err}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    def clear_action():
+        book_id_entry.delete(0, tk.END)
+        student_id_entry.delete(0, tk.END)
+        student_name_entry.delete(0, tk.END)
+        date_entry.delete(0, tk.END)
+        book_name_entry.delete(0, tk.END)
+        date_entry.insert(0, datetime.today().strftime('%Y-%m-%d'))
+
+    # 3. Action Buttons Alignment Layer Panel
+    btn_frame = tk.Frame(reg_window, bg=BG_DARK)
+    btn_frame.pack(pady=25)
+
+    submit_btn = tk.Button(
+        btn_frame, 
+        text="📥  Submit Data", 
+        font=("Segoe UI", 12, "bold"), 
+        bg=SUBMIT_BG, 
+        fg="white", 
+        activebackground=SUBMIT_HOVER,
+        activeforeground="white", 
+        width=16, 
+        relief="flat", 
+        bd=0,
+        cursor="hand2",
+        command=submit_action
+    )
+    submit_btn.pack(side="left", padx=12, ipady=6)
+    submit_btn.bind("<Enter>", lambda e: on_btn_enter(e, SUBMIT_HOVER))
+    submit_btn.bind("<Leave>", lambda e: on_btn_leave(e, SUBMIT_BG))
+
+    clear_btn = tk.Button(
+        btn_frame, 
+        text="🧹  Clear Fields", 
+        font=("Segoe UI", 12, "bold"), 
+        bg=CLEAR_BG, 
+        fg="white", 
+        activebackground=CLEAR_HOVER,
+        activeforeground="white", 
+        width=16, 
+        relief="flat", 
+        bd=0,
+        cursor="hand2",
+        command=clear_action
+    )
+    clear_btn.pack(side="left", padx=12, ipady=6)
+    clear_btn.bind("<Enter>", lambda e: on_btn_enter(e, CLEAR_HOVER))
+    clear_btn.bind("<Leave>", lambda e: on_btn_leave(e, CLEAR_BG))
+
+
+
+def open_search_window():
+    search_window = tk.Toplevel(root)
+    search_window.title("Search Library Database")
+    search_window.geometry("660x600") # Added height for comfortable spacing
+    search_window.configure(bg="#121212")
+    search_window.resizable(False, False)
+    
+    # Force focus so it stays modal on top
+    search_window.grab_set()
+
+    # --- Reusable Dashboard Palette Colors ---
+    BG_DARK = "#121212"
+    PANEL_BG = "#1b1f2a"
+    ACCENT_BLUE = "#007AFF"
+    TEXT_WHITE = "#EDEDED"
+    MUTED_SLATE = "#A8B3CF"
+    ENTRY_BG = "#242d42"
+    ENTRY_BORDER = "#323f5c"
+    
+    # Modern Component Action Colors
+    SEARCH_BG = "#0d6efd"
+    SEARCH_HOVER = "#0b5ed7"
+    ERROR_RED = "#ff6b6b"
+    SUCCESS_GREEN = "#2ec4b6"
+
+    # Dynamic Hover Animators
+    def on_btn_enter(e): e.widget.config(bg=SEARCH_HOVER)
+    def on_btn_leave(e): e.widget.config(bg=SEARCH_BG)
+
+    # 1. Header Title
+    tk.Label(
+        search_window,
+        text="Search Book Inventory",
+        font=("Segoe UI", 24, "bold"),
+        bg=BG_DARK,
+        fg=TEXT_WHITE
+    ).pack(pady=(30, 15))
+
+    # 2. Upper Search Interaction Bar
+    search_frame = tk.Frame(search_window, bg=BG_DARK)
+    search_frame.pack(pady=10, fill="x", padx=40)
+    search_frame.grid_columnconfigure(1, weight=1)
+
+    tk.Label(
+        search_frame,
+        text="Enter Book Name:",
+        font=("Segoe UI", 12, "bold"),
+        bg=BG_DARK,
+        fg=MUTED_SLATE
+    ).grid(row=0, column=0, padx=(0, 10), sticky="w")
+
+    search_entry = tk.Entry(
+        search_frame,
+        font=("Segoe UI", 12),
+        bg=ENTRY_BG,
+        fg="white",
+        insertbackground="white",
+        relief="flat",
+        highlightbackground=ENTRY_BORDER,
+        highlightthickness=1,
+        selectbackground=ACCENT_BLUE
+    )
+    search_entry.grid(row=0, column=1, padx=5, sticky="ew")
+    search_entry.focus()
+
+    # 3. Main Modern Display Results Container Card (Replaces the ugly LabelFrame)
+    result_card = tk.Frame(
+        search_window,
+        bg=PANEL_BG,
+        bd=0,
+        highlightbackground=ENTRY_BORDER,
+        highlightthickness=1
+    )
+    result_card.pack(pady=(20, 30), padx=40, fill="both", expand=True)
+
+    # Card Title Anchor Banner
+    card_title = tk.Label(
+        result_card,
+        text="📊  SEARCH METRICS RESULT LOG",
+        font=("Segoe UI", 10, "bold"),
+        bg=PANEL_BG,
+        fg=ACCENT_BLUE,
+        anchor="w"
+    )
+    card_title.pack(fill="x", padx=25, pady=(20, 10))
+
+    # Reusable Label Option Array Mapping
+    lbl_res_opts = {
+        "font": ("Segoe UI", 12),
+        "bg": PANEL_BG,
+        "anchor": "w"
+    }
+
+    id_result_lbl = tk.Label(result_card, text="Book ID:  --", fg=TEXT_WHITE, **lbl_res_opts)
+    id_result_lbl.pack(fill="x", padx=25, pady=6)
+
+    name_result_lbl = tk.Label(result_card, text="Book Name:  --", fg=TEXT_WHITE, **lbl_res_opts)
+    name_result_lbl.pack(fill="x", padx=25, pady=6)
+
+    student_id_lbl = tk.Label(result_card, text="Student ID:  --", fg=TEXT_WHITE, **lbl_res_opts)
+    student_id_lbl.pack(fill="x", padx=25, pady=6)
+
+    student_name_lbl = tk.Label(result_card, text="Student Name:  --", fg=TEXT_WHITE, **lbl_res_opts)
+    student_name_lbl.pack(fill="x", padx=25, pady=6)
+
+    issue_date_lbl = tk.Label(result_card, text="Issued Date:  --", fg=TEXT_WHITE, **lbl_res_opts)
+    issue_date_lbl.pack(fill="x", padx=25, pady=6)
+
+    status_result_lbl = tk.Label(result_card, text="Availability Status:  --", fg=MUTED_SLATE, **lbl_res_opts)
+    status_result_lbl.pack(fill="x", padx=25, pady=(6, 20))
+
+    # --- Core Backend Mechanics Logic Wrapper ---
+    def perform_search():
+        query_name = search_entry.get().strip().lower()
+
+        if not query_name:
+            messagebox.showwarning("Search Warning", "Please enter a book name to search!")
+            return
+
+        found_id = None
+        found_name = None
+
+        for b_id, b_name in INVENTORY_BOOKS.items():
+            if b_name.lower() == query_name:
+                found_id = b_id
+                found_name = b_name
+                break
+
+        if found_id is None:
+            id_result_lbl.config(text="Book ID: Not Found", fg=ERROR_RED)
+            name_result_lbl.config(text=f"Book Name: '{search_entry.get()}' missing from catalog", fg=ERROR_RED)
+            student_id_lbl.config(text="Student ID: --", fg=ERROR_RED)
+            student_name_lbl.config(text="Student Name: --", fg=ERROR_RED)
+            issue_date_lbl.config(text="Issued Date: --", fg=ERROR_RED)
+            status_result_lbl.config(text="Availability Status: Unknown Catastrophic Error", fg=ERROR_RED)
+            return
+
+        is_issued = False
+        student_id = "--"
+        student_name = "--"
+        issue_date = "--"
+
+        try:
+            conn = mysql.connector.connect(
+                host="127.0.0.1",
+                user="root",
+                password="root123456",
+                database="student_db"
+            )
+            cursor = conn.cursor()
+            cursor.execute("""
+                SELECT student_id, student_name, date_of_issue
+                FROM books_issued WHERE book_id = %s
+            """, (found_id,))
+            
+            record = cursor.fetchone()
+            if record:
+                is_issued = True
+                student_id = record[0]
+                student_name = record[1]
+                if hasattr(record[2], "strftime"):
+                    issue_date = record[2].strftime("%Y-%m-%d")
+                else:
+                    issue_date = str(record[2])
+        except mysql.connector.Error as e:
+            print(f"Database read error during check: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+        # Update labels back to crisp standard layouts on success
+        id_result_lbl.config(text=f"Book ID: {found_id}", fg=TEXT_WHITE)
+        name_result_lbl.config(text=f"Book Name: {found_name}", fg=TEXT_WHITE)
+        student_id_lbl.config(text=f"Student ID: {student_id}", fg=TEXT_WHITE)
+        student_name_lbl.config(text=f"Student Name: {student_name}", fg=TEXT_WHITE)
+        issue_date_lbl.config(text=f"Issued Date: {issue_date}", fg=TEXT_WHITE)
+
+        if is_issued:
+            status_result_lbl.config(text="Availability Status: 🔴 NOT AVAILABLE (Issued)", fg=ERROR_RED)
+        else:
+            status_result_lbl.config(text="Availability Status: 🟢 AVAILABLE IN STORAGE", fg=SUCCESS_GREEN)
+
+    # Bind the Enter key on the entry box to trigger search automatically
+    search_window.bind('<Return>', lambda event: perform_search())
+
+    # Pack search button inside input bar cleanly
+    search_btn = tk.Button(
+        search_frame,
+        text="🔍 Search",
+        font=("Segoe UI", 11, "bold"),
+        bg=SEARCH_BG,
+        fg="white",
+        activebackground=SEARCH_HOVER,
+        activeforeground="white",
+        command=perform_search,
+        relief="flat",
+        bd=0,
+        width=12,
+        cursor="hand2"
+    )
+    search_btn.grid(row=0, column=2, padx=(10, 0), ipady=3)
+    search_btn.bind("<Enter>", on_enter)
+    search_btn.bind("<Leave>", on_leave)
+
+def open_tables_window():
+    tables_window = tk.Toplevel(root)
+    tables_window.title("Database Tables")
+    tables_window.geometry("1020x620") 
+    tables_window.configure(bg="#121212")
+    
+    tables_window.grab_set()
+
+    # --- Structural Colors ---
+    BG_DARK = "#121212"
+    PANEL_BG = "#1b1f2a"
+    ACCENT_BLUE = "#007AFF"
+    TEXT_WHITE = "#EDEDED"
+    MUTED_SLATE = "#A8B3CF"
+    ENTRY_BG = "#242d42"
+    ENTRY_BORDER = "#323f5c"
+    RETURN_BG = "#e63946"      
+    RETURN_HOVER = "#bd1f2d"
+
+    # Header Title
+    tk.Label(
+        tables_window, 
+        text="Issued Books Table Records", 
+        font=("Segoe UI", 22, "bold"), 
+        bg=BG_DARK, 
+        fg=TEXT_WHITE
+    ).pack(pady=(25, 10))
+
+    table_style = ttk.Style()
+    table_style.theme_use("clam")  # Crucial to override native Windows backgrounds!
+
+    # 1. Target the complete inner canvas body layout fields
+    table_style.configure(
+        "Treeview",
+        background=PANEL_BG,        # True dark panel background
+        foreground=TEXT_WHITE,      # Bright readable row text
+        fieldbackground=PANEL_BG,   # Forces the empty space below rows to stay dark!
+        rowheight=35,               # Clean vertical cell separation spacing
+        font=("Segoe UI", 10),
+        borderwidth=0
+    )
+
+    # 2. Target item row active selection color states
+    table_style.map(
+        "Treeview",
+        background=[('selected', ACCENT_BLUE)],
+        foreground=[('selected', 'white')]
+    )
+
+    # 3. Target the Header component backgrounds explicitly
+    table_style.configure(
+        "Treeview.Heading",
+        background="#222a3d",       # Darker metallic header tone
+        foreground=TEXT_WHITE,      # Header text color
+        font=("Segoe UI", 10, "bold"),
+        relief="flat",
+        borderwidth=0,
+        padding=8
+    )
+
+    # 4. Prevent the header from turning bright white on mouse hover interaction
+    table_style.map(
+        "Treeview.Heading",
+        background=[('active', "#2e3b56"), ('pressed', "#1a2333")],
+        foreground=[('active', 'white'), ('pressed', 'white')]
+    )
+
+    # 5. Restyle the Scrollbar tracking layout component
+    table_style.configure(
+        "Vertical.TScrollbar",
+        background="#222a3d",
+        troughcolor=BG_DARK,
+        arrowcolor=TEXT_WHITE,
+        relief="flat",
+        borderwidth=0
+    )
+
+    # 2. Main Card Container
+    table_card = tk.Frame(tables_window, bg=PANEL_BG, bd=0, highlightbackground=ENTRY_BORDER, highlightthickness=1)
+    table_card.pack(fill="both", expand=True, padx=35, pady=(10, 15))
+
+    columns = ("book_id", "student_id", "student_name", "date_of_issue", "book_name", "fine")
+    tree = ttk.Treeview(table_card, columns=columns, show="headings", height=12)
+    
+    tree.heading("book_id", text="Book ID")
+    tree.heading("student_id", text="Student ID")
+    tree.heading("student_name", text="Student Name")
+    tree.heading("date_of_issue", text="Date of Issue")
+    tree.heading("book_name", text="Book Name")
+    tree.heading("fine", text="Accumulated Fine")
+    
+    tree.column("book_id", width=90, anchor="center")
+    tree.column("student_id", width=110, anchor="center")
+    tree.column("student_name", width=160, anchor="w")
+    tree.column("date_of_issue", width=130, anchor="center")
+    tree.column("book_name", width=200, anchor="w")
+    tree.column("fine", width=140, anchor="center")
+    
+    scrollbar = ttk.Scrollbar(table_card, orient="vertical", command=tree.yview)
+    tree.configure(yscrollcommand=scrollbar.set)
+    
+    scrollbar.pack(side="right", fill="y")
+    tree.pack(side="left", fill="both", expand=True, padx=1, pady=1)
+
+    # --- Core Mechanics Processing Arrays ---
+    def load_table_records():
+        for item in tree.get_children():
+            tree.delete(item)
+            
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT book_id, student_id, student_name, date_of_issue, book_name, fine FROM books_issued;")
+            rows = cursor.fetchall()
+            
+            for row in rows:
+                b_id, s_id, s_name, issue_date, b_name, stored_fine = row
+                
+                if isinstance(issue_date, str):
+                    issue_date_obj = datetime.strptime(issue_date, "%Y-%m-%d").date()
+                else:
+                    issue_date_obj = issue_date
+
+                fine_str = f"₹ {stored_fine}"
+                
+                tree.insert("", tk.END, values=(b_id, s_id, s_name, issue_date_obj.strftime('%Y-%m-%d'), b_name, fine_str))
+        except mysql.connector.Error as e:
+            messagebox.showerror("Fetch Error", f"Could not retrieve database rows: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    def clear_selected_record():
+        selected_item = tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Selection Warning", "Please click on a record row from the table list first to clear it!")
+            return
+            
+        record_values = tree.item(selected_item)['values']
+        target_book_id = record_values[0]
+        student_id_target = record_values[1]
+        student_target = record_values[2] 
+        date_issued_target = record_values[3]
+        book_name_target = record_values[4]
+        
+        # --- PASSWORD PROMPT POPUP WINDOW ---
+        pass_prompt = tk.Toplevel(tables_window)
+        pass_prompt.title("Authorization Required")
+        pass_prompt.geometry("380x200")
+        pass_prompt.configure(bg=BG_DARK)
+        pass_prompt.resizable(False, False)
+        pass_prompt.transient(tables_window) 
+        pass_prompt.grab_set() 
+        
+        tk.Label(pass_prompt, text="SECURITY VALIDATION REQUIRED", font=("Segoe UI", 11, "bold"), bg=BG_DARK, fg=ACCENT_BLUE).pack(pady=(25, 5))
+        tk.Label(pass_prompt, text="Enter Administrative token keys to complete return:", font=("Segoe UI", 9), bg=BG_DARK, fg=MUTED_SLATE).pack(pady=(0, 10))
+        
+        pwd_entry = tk.Entry(
+            pass_prompt, 
+            show="*", 
+            font=("Segoe UI", 12), 
+            bg=ENTRY_BG, 
+            fg="white", 
+            insertbackground="white", 
+            relief="flat", 
+            width=24,
+            highlightbackground=ENTRY_BORDER,
+            highlightthickness=1
+        )
+        pwd_entry.pack(pady=5)
+        pwd_entry.focus()
+
+        def verify_action():
+            if pwd_entry.get() == "secret123":
+                pass_prompt.destroy()
+                try:
+                    conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+                    cursor = conn.cursor()
+                    
+                    archive_query = """
+                        INSERT INTO archived_books (book_id, student_id, student_name, date_of_issue, book_name)
+                        VALUES (%s, %s, %s, %s, %s);
+                    """
+                    cursor.execute(archive_query, (int(target_book_id), student_id_target, student_target, date_issued_target, book_name_target))
+                    
+                    cursor.execute("DELETE FROM books_issued WHERE book_id = %s;", (int(target_book_id),))
+                    conn.commit()
+                    
+                    messagebox.showinfo("Returned Successfully", "Record archived safely! Book available in active inventory once again.")
+                    load_table_records()  
+                except mysql.connector.Error as e:
+                    messagebox.showerror("Database Execution Error", f"Could not finalize automated history migration: {e}")
+                finally:
+                    if 'conn' in locals() and conn.is_connected():
+                        cursor.close()
+                        conn.close()
+            else:
+                messagebox.showerror("Access Denied", "Incorrect system verification token! Operation terminated.")
+                pwd_entry.delete(0, tk.END)
+
+        pass_prompt.bind('<Return>', lambda event: verify_action())
+
+        confirm_btn = tk.Button(
+            pass_prompt, 
+            text="Verify Access Token", 
+            font=("Segoe UI", 10, "bold"), 
+            bg=ACCENT_BLUE, 
+            fg="white", 
+            activebackground="#0b5ed7",
+            activeforeground="white",
+            width=18, 
+            relief="flat", 
+            bd=0,
+            cursor="hand2",
+            command=verify_action
+        )
+        confirm_btn.pack(pady=15, ipady=4)
+
+    # ==============================================================================
+    # Lower Button Bar (FIXED & SPACED)
+    # ==============================================================================
+    btn_control_frame = tk.Frame(tables_window, bg=BG_DARK)
+    btn_control_frame.pack(pady=1, fill="x", padx=35) # Fill horizontally to give room
+
+    return_btn = tk.Button(
+        btn_control_frame, 
+        text="🔄  Mark Selected as Returned / Clear Record", 
+        font=("Segoe UI", 12, "bold"), 
+        bg=RETURN_BG, 
+        fg="white", 
+        activebackground=RETURN_HOVER,
+        activeforeground="white",
+        relief="flat", 
+        bd=0,
+        cursor="hand2",
+        command=clear_selected_record
+    )
+    # CHANGED: Added fill="x" to stretch it out beautifully, and ipady=10 for great thickness
+    return_btn.pack(fill="x", ipady=10)
+    
+    def on_btn_enter(e): e.widget.config(bg=RETURN_HOVER)
+    def on_btn_leave(e): e.widget.config(bg=RETURN_BG)
+    return_btn.bind("<Enter>", on_btn_enter)
+    return_btn.bind("<Leave>", on_btn_leave)
+
+    load_table_records()
+
+
+def open_developer_credits():
+    # Create a modal popup window
+    credits_win = tk.Toplevel(root)
+    credits_win.title("System Manifest")
+    credits_win.geometry("380x280")
+    credits_win.configure(bg="#141722")
+    credits_win.resizable(False, False)
+    
+    # Force focus so it stays on top safely
+    credits_win.grab_set()
+
+    # Title Header
+    tk.Label(
+        credits_win, 
+        text="DEVELOPER MANIFEST", 
+        font=("Segoe UI", 12, "bold"), 
+        bg="#141722", 
+        fg="#007AFF"
+    ).pack(pady=(25, 15))
+
+    # Dev list background card container
+    card = tk.Frame(credits_win, bg="#1c202e", highlightbackground="#252b3d", highlightthickness=1)
+    card.pack(fill="both", expand=True, padx=25, pady=(0, 20))
+
+    # Options mapping for consistency
+    dev_opts = {"font": ("Segoe UI", 11, "bold"), "bg": "#1c202e", "fg": "#EDEDED", "anchor": "w"}
+    lazy_opts = {"font": ("Segoe UI", 11, "italic"), "bg": "#1c202e", "fg": "#A8B3CF", "anchor": "w"}
+
+    # Dynamic line elements
+    tk.Label(card, text="1) Shantam", **dev_opts).pack(fill="x", padx=20, pady=(18, 6))
+    tk.Label(card, text="2) Keshav", **dev_opts).pack(fill="x", padx=20, pady=6)
+    tk.Label(card, text="3) Sarthak (He didn't do shit)", **dev_opts).pack(fill="x", padx=20, pady=6)
+
+    # Clean execution dismissal button
+    close_btn = tk.Button(
+        credits_win, 
+        text="Acknowledge", 
+        command=credits_win.destroy,
+        font=("Segoe UI", 10, "bold"),
+        bg="#222a3d",
+        fg="#FFFFFF",
+        activebackground="#2e3b56",
+        activeforeground="#FFFFFF",
+        bd=0,
+        relief="flat",
+        cursor="hand2"
+    )
+    close_btn.pack(fill="x", padx=25, pady=(0, 25), ipady=6)
+
+
+def open_update_window():
+    update_window = tk.Toplevel(root)
+    update_window.title("Update Library Records")
+    update_window.geometry("620x650") # Added spacing for a cleaner visual layout
+    update_window.configure(bg="#121212")
+    update_window.resizable(False, False)
+    
+    update_window.grab_set()
+
+    # --- Reusable Unified Dashboard Palette Colors ---
+    BG_DARK = "#121212"
+    PANEL_BG = "#1b1f2a"
+    ACCENT_BLUE = "#007AFF"
+    TEXT_WHITE = "#EDEDED"
+    MUTED_SLATE = "#A8B3CF"
+    ENTRY_BG = "#242d42"
+    ENTRY_BORDER = "#323f5c"
+    
+    # Modern Action Button Colors
+    SAVE_BG = "#0d6efd"       # Premium Dashboard Blue
+    SAVE_HOVER = "#0b5ed7"
+    LOAD_BG = "#222a3d"       # Sophisticated Secondary Slate
+    LOAD_HOVER = "#2e3b56"
+
+    # Dynamic Hover Animators
+    def on_btn_enter(e, color): e.widget.config(bg=color)
+    def on_btn_leave(e, color): e.widget.config(bg=color)
+
+    # 1. Header Title
+    tk.Label(
+        update_window, 
+        text="Modify Record Fields", 
+        font=("Segoe UI", 24, "bold"), 
+        bg=BG_DARK, 
+        fg=TEXT_WHITE
+    ).pack(pady=(30, 15))
+    
+    # 2. Upper Dynamic Record Locator Row
+    fetch_frame = tk.Frame(update_window, bg=BG_DARK)
+    fetch_frame.pack(padx=35, fill="x", pady=5)
+    fetch_frame.grid_columnconfigure(1, weight=1)
+    
+    tk.Label(
+        fetch_frame, 
+        text="Enter Book ID to Modify:", 
+        font=("Segoe UI", 12, "bold"), 
+        bg=BG_DARK, 
+        fg=MUTED_SLATE
+    ).grid(row=0, column=0, padx=(0, 10), sticky="w")
+    
+    search_id_entry = tk.Entry(
+        fetch_frame, 
+        font=("Segoe UI", 12), 
+        bg=ENTRY_BG, 
+        fg="white", 
+        insertbackground="white", 
+        relief="flat",
+        highlightbackground=ENTRY_BORDER,
+        highlightthickness=1,
+        selectbackground=ACCENT_BLUE
+    )
+    search_id_entry.grid(row=0, column=1, padx=5, sticky="ew")
+    search_id_entry.focus()
+    
+        # 3. Main Center Control Card Container Frame (FIXED SYNTAX)
+    fields_card = tk.Frame(update_window, bg=PANEL_BG, bd=0, highlightbackground=ENTRY_BORDER, highlightthickness=1)
+    fields_card.pack(padx=35, pady=(15, 20), fill="both", expand=True)
+
+    # Invisible layout grid container inside the panel card
+    grid_container = tk.Frame(fields_card, bg=PANEL_BG)
+    grid_container.pack(padx=30, pady=25, fill="both", expand=True)
+    grid_container.grid_columnconfigure(1, weight=1)
+    
+    lbl_opts = {"font": ("Segoe UI", 12, "bold"), "bg": PANEL_BG, "fg": MUTED_SLATE, "anchor": "w"}
+    
+    # FIXED: Re-separated the entry configuration flags correctly into valid keys
+    ent_opts = {
+        "font": ("Segoe UI", 12), 
+        "bg": ENTRY_BG, 
+        "fg": "white", 
+        "insertbackground": "white", 
+        "relief": "flat",
+        "highlightbackground": ENTRY_BORDER,
+        "highlightthickness": 1,
+        "selectbackground": ACCENT_BLUE
+    }
+    
+    tk.Label(grid_container, text="Book Name:", **lbl_opts).grid(row=0, column=0, sticky="w", pady=10)
+    up_book_name = tk.Entry(grid_container, **ent_opts)
+    up_book_name.grid(row=0, column=1, pady=10, padx=(15, 0), sticky="ew")
+    
+    tk.Label(grid_container, text="Student ID:", **lbl_opts).grid(row=1, column=0, sticky="w", pady=10)
+    up_student_id = tk.Entry(grid_container, **ent_opts)
+    up_student_id.grid(row=1, column=1, pady=10, padx=(15, 0), sticky="ew")
+    
+    tk.Label(grid_container, text="Student Name:", **lbl_opts).grid(row=2, column=0, sticky="w", pady=10)
+    up_student_name = tk.Entry(grid_container, **ent_opts)
+    up_student_name.grid(row=2, column=1, pady=10, padx=(15, 0), sticky="ew")
+    
+    tk.Label(grid_container, text="Date Issued:", **lbl_opts).grid(row=3, column=0, sticky="w", pady=10)
+    up_date_issue = tk.Entry(grid_container, **ent_opts)
+    up_date_issue.grid(row=3, column=1, pady=10, padx=(15, 0), sticky="ew")
+
+    tk.Label(grid_container, text="Accumulated Fine:", **lbl_opts).grid(row=4, column=0, sticky="w", pady=10)
+    up_fine = tk.Entry(grid_container, **ent_opts)
+    up_fine.grid(row=4, column=1, pady=10, padx=(15, 0), sticky="ew")
+
+
+    # --- Core Mechanics Processing Backend Methods ---
+    def fetch_target_record():
+        b_id = search_id_entry.get().strip()
+        if not b_id or not b_id.isdigit():
+            messagebox.showwarning("Input Missing", "Please enter a valid numeric Book ID!")
+            return
+            
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            cursor.execute("SELECT book_name, student_id, student_name, date_of_issue, fine FROM books_issued WHERE book_id = %s;", (int(b_id),))
+            record = cursor.fetchone()
+            
+            if not record:
+                messagebox.showerror("Not Found", f"No active issue records discovered matching Book ID: {b_id}")
+                return
+                
+            up_book_name.delete(0, tk.END)
+            up_student_id.delete(0, tk.END)
+            up_student_name.delete(0, tk.END)
+            up_date_issue.delete(0, tk.END)
+            up_fine.delete(0, tk.END)
+            
+            up_book_name.insert(0, record[0])
+            up_student_id.insert(0, record[1])
+            up_student_name.insert(0, record[2])
+            
+            date_val = record[3].strftime('%Y-%m-%d') if isinstance(record[3], datetime) or hasattr(record[3], 'strftime') else str(record[3])
+            up_date_issue.insert(0, date_val)
+            up_fine.insert(0, str(record[4]))
+            
+            messagebox.showinfo("Loaded", "Record fetched successfully! You can now make changes.")
+            
+        except mysql.connector.Error as e:
+            messagebox.showerror("Error", f"Could not read row: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    def commit_updates():
+        b_id = search_id_entry.get().strip()
+        b_name = up_book_name.get().strip()
+        s_id = up_student_id.get().strip()
+        s_name = up_student_name.get().strip()
+        d_issue = up_date_issue.get().strip()
+        f_amt = up_fine.get().strip()
+        
+        if not b_id or not b_name or not s_id or not s_name or not d_issue or f_amt == "":
+            messagebox.showwarning("Validation Error", "All fields must be completely filled out before saving updates!")
+            return
+            
+        if not f_amt.isdigit():
+            messagebox.showerror("Input Error", "Fine layout value structure must be a valid whole number integer string!")
+            return
+
+        try:
+            datetime.strptime(d_issue, "%Y-%m-%d")
+        except ValueError:
+            messagebox.showerror("Format Error", "Date must strictly use the YYYY-MM-DD format structure!")
+            return
+            
+        try:
+            conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+            cursor = conn.cursor()
+            query = """
+                UPDATE books_issued 
+                SET book_name = %s, student_id = %s, student_name = %s, date_of_issue = %s, fine = %s 
+                WHERE book_id = %s;
+            """
+            cursor.execute(query, (b_name, s_id, s_name, d_issue, int(f_amt), int(b_id)))
+            conn.commit()
+            
+            messagebox.showinfo("Success", "Library schema modifications saved successfully!")
+            update_window.destroy() 
+        except mysql.connector.Error as e:
+            messagebox.showerror("Database Execution Error", f"Could not update fields: {e}")
+        finally:
+            if 'conn' in locals() and conn.is_connected():
+                cursor.close()
+                conn.close()
+
+    # Automatically map the keyboard Enter key inside the ID search box to run the query
+    update_window.bind('<Return>', lambda event: fetch_target_record())
+
+    # Build and map the upper load button
+    fetch_btn = tk.Button(
+        fetch_frame, 
+        text="🔍 Find/Load", 
+        font=("Segoe UI", 11, "bold"), 
+        bg=LOAD_BG, 
+        fg="white", 
+        activebackground=LOAD_HOVER,
+        activeforeground="white",
+        command=fetch_target_record, 
+        relief="flat", 
+        bd=0,
+        width=12,
+        cursor="hand2"
+    )
+    fetch_btn.grid(row=0, column=2, padx=(10, 0), ipady=3)
+    fetch_btn.bind("<Enter>", lambda e: on_btn_enter(e, LOAD_HOVER))
+    fetch_btn.bind("<Leave>", lambda e: on_btn_leave(e, LOAD_BG))
+    
+    # 4. Lower Command Save Action Framework Layer Panel
+    btn_frame = tk.Frame(update_window, bg=BG_DARK)
+    btn_frame.pack(pady=20, fill="x", padx=35)
+
+    save_btn = tk.Button(
+        btn_frame, 
+        text="💾  Save Updates", 
+        font=("Segoe UI", 13, "bold"), 
+        bg=SAVE_BG, 
+        fg="white", 
+        activebackground=SAVE_HOVER,
+        activeforeground="white",
+        relief="flat", 
+        bd=0,
+        cursor="hand2",
+        command=commit_updates
+    )
+    save_btn.pack(fill="x", ipady=10)
+    save_btn.bind("<Enter>", lambda e: on_btn_enter(e, SAVE_HOVER))
+    save_btn.bind("<Leave>", lambda e: on_btn_leave(e, SAVE_BG))
+
+
+
+def open_archive_history_view():
+    arch_win = tk.Toplevel(root)
+    arch_win.title("Permanent History Returns Log Archive")
+    arch_win.geometry("950x500")
+    arch_win.configure(bg="#111111")
+    
+    tk.Label(arch_win, text="📚 Permanent Historical Book Logs Archive", font=("Segoe UI", 18, "bold"), bg="#111111", fg="#007AFF").pack(pady=15)
+    
+    columns = ("arc_id", "b_id", "s_id", "s_name", "iss_date", "b_name", "ret_date")
+    a_tree = ttk.Treeview(arch_win, columns=columns, show="headings", height=14)
+    
+    a_tree.heading("arc_id", text="Log ID")
+    a_tree.heading("b_id", text="Book ID")
+    a_tree.heading("s_id", text="Student ID")
+    a_tree.heading("s_name", text="Student Name")
+    a_tree.heading("iss_date", text="Issue Date")
+    a_tree.heading("b_name", text="Book Name")
+    a_tree.heading("ret_date", text="Returned Timestamp")
+    
+    a_tree.column("arc_id", width=60, anchor="center")
+    a_tree.column("b_id", width=70, anchor="center")
+    a_tree.column("s_id", width=90, anchor="center")
+    a_tree.column("s_name", width=140, anchor="w")
+    a_tree.column("iss_date", width=110, anchor="center")
+    a_tree.column("b_name", width=160, anchor="w")
+    a_tree.column("ret_date", width=180, anchor="center")
+    
+    scroll = ttk.Scrollbar(arch_win, orient="vertical", command=a_tree.yview)
+    a_tree.configure(yscrollcommand=scroll.set)
+    
+    a_tree.pack(side="left", fill="both", expand=True, padx=(20,0), pady=15)
+    scroll.pack(side="right", fill="y", padx=(0,20), pady=15)
+    
+    try:
+        conn = mysql.connector.connect(host="127.0.0.1", user="root", password="root123456", database="student_db")
+        cursor = conn.cursor()
+        cursor.execute("SELECT archive_id, book_id, student_id, student_name, date_of_issue, book_name, date_of_return FROM archived_books ORDER BY date_of_return DESC;")
+        records = cursor.fetchall()
+        
+        for item in records:
+            iss_str = item[4].strftime('%Y-%m-%d') if hasattr(item[4], 'strftime') else str(item[4])
+            ret_str = item[6].strftime('%Y-%m-%d %H:%M:%S') if hasattr(item[6], 'strftime') else str(item[6])
+            a_tree.insert("", tk.END, values=(item[0], item[1], item[2], item[3], iss_str, item[5], ret_str))
+    except Error as e:
+        messagebox.showerror("Error Loading Archive", f"Could not sync with structural storage history rows: {e}\n\nAuth plugin issue: caching_sha2_password is not supported by your current mysql-connector/Python driver.\nConsider updating mysql-connector-python or changing the MySQL user auth plugin.")
+    finally:
+        if 'conn' in locals() and conn.is_connected():
+            cursor.close()
+            conn.close()
+
+
+# ==========================================
+# 3. SECURE AUTHENTICATION SYSTEM
+# ==========================================
+def open_login_screen():
+    login_win = tk.Toplevel(root)
+    login_win.title("Secure Gatekeeper System")
+    login_win.geometry("400x320")
+    login_win.configure(bg="#121212")
+    
+    # Force focus onto the login window so it pops up in front of everything
+    login_win.grab_set()
+    
+    def on_login_close():
+        root.destroy()
+    login_win.protocol("WM_DELETE_WINDOW", on_login_close)
+
+    tk.Label(login_win, text="SECURITY ACCESS", font=("Segoe UI", 18, "bold"), bg="#121212", fg="#FFFCC6").pack(pady=(25, 15))
+
+    lbl_opts = {"font": ("Segoe UI", 11), "bg": "#121212", "fg": "#E1E1E1"}
+    ent_opts = {"font": ("Segoe UI", 11), "bg": "#2d2d2d", "fg": "white", "insertbackground": "white", "relief": "flat"}
+
+    tk.Label(login_win, text="Administrator Identity ID:", **lbl_opts).pack(pady=(10, 2))
+    username_entry = tk.Entry(login_win, width=28, **ent_opts)
+    username_entry.pack(pady=2)
+    username_entry.focus()
+
+    tk.Label(login_win, text="System Verification Token:", **lbl_opts).pack(pady=(10, 2))
+    
+    password_frame = tk.Frame(login_win, bg="#121212")
+    password_frame.pack(pady=2)
+
+    password_entry = tk.Entry(password_frame, show="*", width=20, **ent_opts)
+    password_entry.pack(side=tk.LEFT)
+
+    def toggle_password():
+        if password_entry.cget("show") == "*":
+            password_entry.config(show="")
+            toggle_btn.config(text="Hide")
+        else:
+            password_entry.config(show="*")
+            toggle_btn.config(text="Show")
+
+    # FIXED: fg="white" so the button words don't blend into the dark gray background
+    toggle_btn = tk.Button(password_frame, text="Show", font=("Segoe UI", 9, "bold"), command=toggle_password, width=6, bg="#333333", fg="white", relief="flat", cursor="hand2")
+    toggle_btn.pack(side=tk.LEFT, padx=(6, 0))
+
+    def check_login():
+        username = username_entry.get().strip()
+        password = password_entry.get()
+        
+        if username == "admin" and password == "secret123":
+            messagebox.showinfo("Success", "Authorisation Token verified successfully!")
+            login_win.destroy()
+            root.deiconify() 
+        else:
+            messagebox.showerror("Access Denied", "Invalid administrative identity mapping arrays.")
+
+    login_win.bind('<Return>', lambda event: check_login())
+
+    # FIXED: fg="white" to contrast beautiful neon blue accenting
+    login_button = tk.Button(login_win, text="Authenticate System", font=("Segoe UI", 12, "bold"), command=check_login, bg="#007AFF", fg="white", relief="flat", width=20, cursor="hand2")
+    login_button.pack(pady=30)
+
+
+
+# ==========================================
+# 4. TKINTER MAIN INTERFACE AND LAYOUT
+# ==========================================
+
+import tkinter as tk
+from tkinter import ttk
+import time
+from PIL import Image, ImageTk
+
+root = tk.Tk()
+#root.withdraw()
+root.title("Library Unified Network Database")
+root.geometry("1080x720") 
+root.configure(bg="#121212")
+
+# Base colors
+BG = "#121212"
+PANEL = "#1b1f2a"
+ACCENT = "#007AFF"
+TEXT = "#EDEDED"
+MUTED = "#A8B3CF"
+
+# Enhanced Interactive Button Colors
+BTN_BG = "#222a3d"      
+BTN_BORDER = "#323f5c"   # Subtly lighter than background for a sleek edge glow
+BTN_FG = "#FFFFFF"      
+BTN_HOVER = "#2e3b56"   
+EXIT_BG = "#3d1e22"     
+EXIT_HOVER = "#5c262c"  
+
+# ==============================================================================
+# Hover Mechanics & Clock Functions
+# ==============================================================================
+def on_enter(e):
+    if e.widget.cget("text").strip().endswith("Exit"):
+        e.widget.config(bg=EXIT_HOVER)
+    else:
+        e.widget.config(bg=BTN_HOVER, highlightbackground=ACCENT)
+
+def on_leave(e):
+    if e.widget.cget("text").strip().endswith("Exit"):
+        e.widget.config(bg=EXIT_BG)
+    else:
+        e.widget.config(bg=BTN_BG, highlightbackground=BTN_BORDER)
+
+def update_clock():
+    current_time = time.strftime("%H:%M:%S | %Y-%m-%d")
+    status_bar_clock.config(text=f" 🕒 System Time: {current_time} ")
+    root.after(1000, update_clock)
+
+# ==============================================================================
+# Header Framework (Logo Placed on Right with Perfect Spacing)
+# ==============================================================================
+header = tk.Frame(root, bg=BG)
+header.pack(fill="x", pady=(25, 15))
+
+# 1. Title stays on the left (now keeps the master 35px padding)
+app_title = tk.Label(
+    header,
+    text="Library Unified Network",
+    font=("Segoe UI", 24, "bold"),
+    bg=BG,
+    fg=TEXT
+)
+app_title.pack(side="left", padx=(35, 12))
+
+# 2. LOGO: Now packed right after the Title, moving it to the right side
+try:
+    logo_raw = Image.open("logo.png")
+    # Increased width to 46 for a wider, prominent look while maintaining look
+    logo_resized = logo_raw.resize((150, 100), Image.Resampling.LANCZOS)
+    app_logo = ImageTk.PhotoImage(logo_resized)
+    
+    logo_label = tk.Label(header, image=app_logo, bg=BG)
+    # Packs right after the title with a clean 15px gap on its right
+    logo_label.pack(side="right", padx=(0, 75))
+    logo_label.image = app_logo 
+except Exception as e:
+    print(f"Logo tracking skipped: {e}")
+
+# 3. Subtitle follows neatly after the logo
+subtitle = tk.Label(
+    header,
+    text="Catalog  •  Issue  •  Search  •  Archive",
+    font=("Segoe UI", 11),
+    bg=BG,
+    fg=MUTED
+)
+subtitle.pack(side="left", pady=(8, 0))
+
+# ==============================================================================
+# Main Layout Workspace
+# ==============================================================================
+main_panel = tk.Frame(root, bg=PANEL, bd=0)
+main_panel.pack(fill="both", expand=True, padx=35, pady=(0, 15))
+
+# Left accent bar accentuating the panel
+accent_bar = tk.Frame(main_panel, bg=ACCENT, width=5)
+accent_bar.pack(side="left", fill="y")
+
+# Left: Responsive Workspace Content 
+btn_container = tk.Frame(main_panel, bg=PANEL)
+btn_container.pack(side="left", fill="both", expand=True, padx=30, pady=30)
+
+# ==============================================================================
+# Right: Advanced Status & Metrics Sidebar Panel
+# ==============================================================================
+status_frame = tk.Frame(main_panel, bg="#141722", width=300)
+status_frame.pack(side="right", fill="both", padx=(0, 20), pady=30)
+status_frame.pack_propagate(False) 
+
+status_title = tk.Label(
+    status_frame, 
+    text="SYSTEM STATUS", 
+    font=("Segoe UI", 11, "bold"), 
+    bg="#141722", 
+    fg=ACCENT,
+    anchor="w"
+)
+status_title.pack(fill="x", padx=20, pady=(25, 5))
+
+status_desc = tk.Label(
+    status_frame, 
+    text="Use the action matrix grid to manage items. Returned assets automatically transfer to log indexes.", 
+    font=("Segoe UI", 10), 
+    bg="#141722", 
+    fg=MUTED,
+    justify="left",
+    anchor="nw",
+    wraplength=250 
+)
+status_desc.pack(fill="x", padx=20, pady=(0, 25))
+
+# Live Data Metric Cards (Visual Polish)
+def create_metric_card(parent, label_text, value_text, color):
+    card = tk.Frame(parent, bg="#1c202e", bd=0, highlightbackground="#252b3d", highlightthickness=1)
+    card.pack(fill="x", padx=20, pady=6, ipady=8)
+    
+    lbl = tk.Label(card, text=label_text, font=("Segoe UI", 9), bg="#1c202e", fg=MUTED, anchor="w")
+    lbl.pack(fill="x", padx=12, pady=(4, 2))
+    
+    val = tk.Label(card, text=value_text, font=("Segoe UI", 14, "bold"), bg="#1c202e", fg=color, anchor="w")
+    val.pack(fill="x", padx=12)
+
+create_metric_card(status_frame, "ACTIVE DATABASE", "CONNECTED", "#00E676")
+create_metric_card(status_frame, "SESSION OPERATOR", "ADMINISTRATOR", TEXT)
+
+info_anchor = tk.Frame(status_frame, bg="#141722")
+info_anchor.pack(side="bottom", fill="x", padx=20, pady=(0, 25))
+
+def info_enter(e): e.widget.config(bg="#222a3d", fg="#007AFF")
+def info_leave(e): e.widget.config(bg="#1c202e", fg="#A8B3CF")
+
+info_btn = tk.Button(
+    info_anchor, 
+    text="ℹ️  System Info", 
+    command=open_developer_credits,
+    font=("Segoe UI", 9, "bold"),
+    bg="#1c202e",          
+    fg=MUTED,
+    activebackground="#222a3d",
+    activeforeground="#007AFF",
+    bd=0,
+    relief="flat",
+    cursor="hand2"
+)
+info_btn.pack(side="right", ipady=5, ipadx=12)
+info_btn.bind("<Enter>", info_enter)
+info_btn.bind("<Leave>", info_leave)
+# ==============================================================================
+
+# Your main action setup continues completely untouched:
+actions = [
+    ("🔷  Book Issue", open_register_window),  
+    ("🔍  Search", open_search_window),       
+    ("🔄  Update", open_update_window),       
+    ("🟢  Record", open_tables_window),        
+    ("🟡  Inventory", open_inventory_window),   
+    ("🗄️  Archive", open_archive_history_view), 
+]
+
+row, col = 0, 0
+max_cols = 3
+
+for i in range(max_cols):
+    btn_container.grid_columnconfigure(i, weight=1)
+for r in range(3): 
+    btn_container.grid_rowconfigure(r, weight=1)
+
+for text, cmd in actions:
+    b = tk.Button(
+        btn_container, 
+        text=text, 
+        command=cmd,
+        font=("Segoe UI", 13, "bold"),
+        bg=BTN_BG,
+        fg=BTN_FG,
+        activebackground=BTN_HOVER,
+        activeforeground=BTN_FG,
+        bd=0,                     
+        relief="flat",
+        highlightbackground=BTN_BORDER, # Clean inner outline border
+        highlightthickness=1,
+        cursor="hand2"            
+    )
+    b.grid(row=row, column=col, padx=12, pady=12, sticky="nsew")
+    
+    b.bind("<Enter>", on_enter)
+    b.bind("<Leave>", on_leave)
+    
+    col += 1
+    if col >= max_cols:
+        col = 0
+        row += 1
+
+# Exit Button
+exit_btn = tk.Button(
+    btn_container, 
+    text="❌  Exit", 
+    command=root.destroy,
+    font=("Segoe UI", 12, "bold"),
+    bg=EXIT_BG,
+    fg=BTN_FG,
+    activebackground=EXIT_HOVER,
+    activeforeground=BTN_FG,
+    bd=0,
+    relief="flat",
+    cursor="hand2"
+)
+exit_btn.grid(row=row, column=0, columnspan=max_cols, padx=12, pady=(25, 12), sticky="ew", ipady=12)
+exit_btn.bind("<Enter>", on_enter)
+exit_btn.bind("<Leave>", on_leave)
+
+# ==============================================================================
+# Bottom Dashboard Status Bar
+# ==============================================================================
+status_bar = tk.Frame(root, bg="#161616", height=25)
+status_bar.pack(side="bottom", fill="x")
+
+status_bar_left = tk.Label(status_bar, text="  🔒 Node: Secure Local Encrypted Cluster", font=("Segoe UI", 9), bg="#161616", fg=MUTED)
+status_bar_left.pack(side="left")
+
+status_bar_clock = tk.Label(status_bar, text="", font=("Segoe UI", 9), bg="#161616", fg=MUTED)
+status_bar_clock.pack(side="right")
+
+# Start background dynamic tasks
+update_clock()
+
+#open_login_screen()
+##root.deiconify() # Safely reveal window after canvas is cleanly structured
+root.mainloop()
